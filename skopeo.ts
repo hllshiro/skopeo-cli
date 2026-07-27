@@ -123,10 +123,9 @@ async function downloadImage(
   const archiveFile = `${opts.savePath}/${fileName}.tar`;
 
   // 3. Check file existence
-  if (!confirmOverwrite(archiveFile, opts.overwrite)) {
-    if (existsSync(archiveFile)) {
-      return { success: true, archiveFile, repoPath, imageName: image };
-    }
+  if (existsSync(archiveFile) && !opts.overwrite) {
+    colorLog(`文件已存在，跳过: ${archiveFile}`, "yellow");
+    return { success: true, archiveFile, repoPath, imageName: image };
   }
 
   // 4. Build skopeo command
@@ -150,6 +149,8 @@ async function downloadImage(
 
   if (proc.exitCode !== 0) {
     colorLog(`下载镜像失败: ${image}`, "red");
+    const errMsg = new TextDecoder().decode(proc.stderr);
+    if (errMsg) colorLog(errMsg, "red");
     // Clean up partial file
     if (existsSync(archiveFile)) {
       unlinkSync(archiveFile);
@@ -184,13 +185,13 @@ async function downloadCommand(
 ): Promise<void> {
   // Default save path
   const savePath = opts.savePath || `${process.env.HOME}/Downloads/docker`;
-  opts.savePath = savePath;
+  const effectiveOpts = { ...opts, savePath };
 
   // Ensure directory exists
   ensureDir(savePath);
 
   // Download
-  const result = await downloadImage(image, opts);
+  const result = await downloadImage(image, effectiveOpts);
 
   if (result.success) {
     colorLog(`已记录: ${image} → docker.senjone.com/${result.repoPath}`, "green");
