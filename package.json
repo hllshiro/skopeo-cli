@@ -1,0 +1,16 @@
+{
+  "name": "skopeo",
+  "module": "skopeo.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "bun run skopeo.ts",
+    "build": "bun build skopeo.ts --compile --outfile skopeo-cli.exe"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}

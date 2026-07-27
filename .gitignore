@@ -1,1 +1,3 @@
 skopeo.exe
+node_modules/
+bun.lock
