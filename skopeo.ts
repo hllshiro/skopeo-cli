@@ -1,5 +1,3 @@
-import { parseArgs as nodeParseArgs } from "node:util";
-
 // ── Types ──────────────────────────────────────────────────────────────────
 
 interface DownloadOptions {
