@@ -1,3 +1,5 @@
+import { existsSync } from "fs";
+
 // ── Types ──────────────────────────────────────────────────────────────────
 
 interface DownloadOptions {
@@ -64,18 +66,35 @@ function parseArgs(
   return { command, positional, options };
 }
 
+const COLORS: Record<string, string> = {
+  red: "\x1b[31m",
+  green: "\x1b[32m",
+  yellow: "\x1b[33m",
+  blue: "\x1b[34m",
+  magenta: "\x1b[35m",
+  cyan: "\x1b[36m",
+  white: "\x1b[37m",
+  reset: "\x1b[0m",
+};
+
 function colorLog(msg: string, color: string): void {
-  // TODO: implement color output
-  console.log(msg);
+  const code = COLORS[color.toLowerCase()] || COLORS.white;
+  console.log(`${code}${msg}${COLORS.reset}`);
 }
 
 function ensureDir(path: string): void {
-  // TODO: implement directory creation
+  Bun.mkdirSync(path, { recursive: true });
 }
 
 function confirmOverwrite(filePath: string, force?: boolean): boolean {
-  // TODO: implement overwrite confirmation
-  return force ?? false;
+  if (!existsSync(filePath)) {
+    return false;
+  }
+  if (force) {
+    return true;
+  }
+  colorLog(`文件已存在，跳过（使用 --overwrite 覆盖）: ${filePath}`, "yellow");
+  return false;
 }
 
 // ── Core logic ─────────────────────────────────────────────────────────────
