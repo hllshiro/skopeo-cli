@@ -1,4 +1,4 @@
-import { existsSync } from "fs";
+import { existsSync, mkdirSync, unlinkSync } from "fs";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -83,7 +83,7 @@ function colorLog(msg: string, color: string): void {
 }
 
 function ensureDir(path: string): void {
-  Bun.mkdirSync(path, { recursive: true });
+  mkdirSync(path, { recursive: true });
 }
 
 function confirmOverwrite(filePath: string, force?: boolean): boolean {
@@ -108,8 +108,57 @@ async function downloadImage(
   image: string,
   opts: DownloadOptions
 ): Promise<DownloadResult> {
-  // TODO: implement image download
-  return { success: false, archiveFile: "", repoPath: "", imageName: image };
+  // 1. Parse image name — strip registry layer
+  const parts = image.split("/");
+  let repoPath = image;
+  if (
+    parts.length > 1 &&
+    (parts[0]!.includes(".") || parts[0]!.includes(":") || parts[0] === "localhost")
+  ) {
+    repoPath = parts.slice(1).join("/");
+  }
+
+  // 2. Generate filename
+  const fileName = repoPath.replace(/:/g, "-").replace(/\//g, "_");
+  const archiveFile = `${opts.savePath}/${fileName}.tar`;
+
+  // 3. Check file existence
+  if (!confirmOverwrite(archiveFile, opts.overwrite)) {
+    if (existsSync(archiveFile)) {
+      return { success: true, archiveFile, repoPath, imageName: image };
+    }
+  }
+
+  // 4. Build skopeo command
+  const skopeoArgs = ["copy", "--all"];
+  if (opts.platform) {
+    const [os, arch] = opts.platform.split("/");
+    if (os) skopeoArgs.push("--override-os", os);
+    if (arch) skopeoArgs.push("--override-arch", arch);
+  }
+  skopeoArgs.push(`docker://${image}`, `oci-archive:${archiveFile}`);
+
+  // 5. Execute skopeo
+  colorLog(`正在下载镜像: ${image}...`, "green");
+  let proc;
+  try {
+    proc = Bun.spawnSync(["skopeo", ...skopeoArgs]);
+  } catch (e: any) {
+    colorLog(`skopeo 未安装或不在 PATH 中: ${e.message}`, "red");
+    return { success: false, archiveFile, repoPath, imageName: image };
+  }
+
+  if (proc.exitCode !== 0) {
+    colorLog(`下载镜像失败: ${image}`, "red");
+    // Clean up partial file
+    if (existsSync(archiveFile)) {
+      unlinkSync(archiveFile);
+    }
+    return { success: false, archiveFile, repoPath, imageName: image };
+  }
+
+  colorLog(`已下载: ${image} → ${archiveFile}`, "green");
+  return { success: true, archiveFile, repoPath, imageName: image };
 }
 
 function generateUploadScript(
@@ -133,8 +182,19 @@ async function downloadCommand(
   image: string,
   opts: DownloadOptions
 ): Promise<void> {
-  // TODO: implement download command
-  colorLog("download command not yet implemented", "yellow");
+  // Default save path
+  const savePath = opts.savePath || `${process.env.HOME}/Downloads/docker`;
+  opts.savePath = savePath;
+
+  // Ensure directory exists
+  ensureDir(savePath);
+
+  // Download
+  const result = await downloadImage(image, opts);
+
+  if (result.success) {
+    colorLog(`已记录: ${image} → docker.senjone.com/${result.repoPath}`, "green");
+  }
 }
 
 // ── Main entry ─────────────────────────────────────────────────────────────
