@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, unlinkSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, unlinkSync } from "fs";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -100,8 +100,31 @@ function confirmOverwrite(filePath: string, force?: boolean): boolean {
 // ── Core logic ─────────────────────────────────────────────────────────────
 
 function parseComposeFile(filePath: string, filter?: string): string[] {
-  // TODO: implement compose file parsing
-  return [];
+  if (!existsSync(filePath)) {
+    colorLog(`错误: 找不到文件 ${filePath}`, "red");
+    process.exit(1);
+  }
+
+  const text = readFileSync(filePath, "utf-8");
+  const allImages: string[] = [];
+  const imageRegex = /^\s*image:\s*(?<image>[^\s]+)/;
+
+  for (const line of text.split("\n")) {
+    const match = line.match(imageRegex);
+    if (match?.groups?.image) {
+      const img = match.groups.image.replace(/['"]/, "");
+      allImages.push(img);
+    }
+  }
+
+  const unique = [...new Set(allImages)];
+
+  if (filter) {
+    colorLog(`应用过滤器: *${filter}*`, "magenta");
+    return unique.filter((img) => img.includes(filter));
+  }
+
+  return unique;
 }
 
 async function downloadImage(
@@ -175,8 +198,46 @@ async function composeCommand(
   file: string,
   opts: ComposeOptions
 ): Promise<void> {
-  // TODO: implement compose command
-  colorLog("compose command not yet implemented", "yellow");
+  if (!existsSync(file)) {
+    colorLog(`错误: 找不到文件 ${file}`, "red");
+    process.exit(1);
+  }
+
+  colorLog(`正在解析 ${file} ...`, "cyan");
+  const images = parseComposeFile(file, opts.filter);
+
+  if (images.length === 0) {
+    colorLog("未找到任何镜像配置。", "yellow");
+    return;
+  }
+
+  const savePath = opts.savePath || `${process.env.HOME}/Downloads/docker`;
+  const effectiveOpts = { ...opts, savePath };
+
+  ensureDir(savePath);
+
+  colorLog(`找到 ${images.length} 个匹配镜像，开始下载...`, "cyan");
+  console.log("==================================================");
+
+  const results: DownloadResult[] = [];
+  for (let i = 0; i < images.length; i++) {
+    const img = images[i]!;
+    colorLog(`[${i + 1}/${images.length}] 准备处理: ${img}`, "cyan");
+
+    const result = await downloadImage(img, effectiveOpts);
+    results.push(result);
+
+    if (!result.success) {
+      colorLog(`警告: ${img} 下载失败。`, "yellow");
+    }
+    console.log("--------------------------------------------------");
+  }
+
+  colorLog("所有镜像调用任务结束！", "green");
+
+  if (!opts.noUploadScript) {
+    generateUploadScript(results, savePath);
+  }
 }
 
 async function downloadCommand(
