@@ -60,10 +60,13 @@ jobs:
 
       - run: bun run build
 
+      - name: Rename binary
+        run: mv skopeo-cli skopeo-linux
+
       - uses: actions/upload-artifact@v4
         with:
           name: skopeo-linux
-          path: skopeo-cli
+          path: skopeo-linux
 
   build-macos:
     if: >-
@@ -82,10 +85,13 @@ jobs:
 
       - run: bun run build
 
+      - name: Rename binary
+        run: mv skopeo-cli skopeo-macos
+
       - uses: actions/upload-artifact@v4
         with:
           name: skopeo-macos
-          path: skopeo-cli
+          path: skopeo-macos
 
   release:
     if: startsWith(github.ref, 'refs/tags/')
@@ -101,7 +107,7 @@ jobs:
         with:
           files: |
             artifacts/skopeo-windows/skopeo-cli.exe
-            artifacts/skopeo-linux/skopeo-cli
-            artifacts/skopeo-macos/skopeo-cli
+            artifacts/skopeo-linux/skopeo-linux
+            artifacts/skopeo-macos/skopeo-macos
           draft: false
           prerelease: false
