@@ -219,7 +219,24 @@ async function downloadImage(
   return { success: true, archiveFile, repoPath, imageName: image };
 }
 
-function generateUploadScript(
+export function parseExistingUploadScript(scriptPath: string): string[] {
+  if (!existsSync(scriptPath)) return [];
+
+  const content = readFileSync(scriptPath, "utf-8");
+  const entries: string[] = [];
+  const entryRegex = /^\s*"([^"]+?\|docker:\/\/[^"]+)"$/;
+
+  for (const line of content.split("\n")) {
+    const match = line.match(entryRegex);
+    if (match?.[1]) {
+      entries.push(match[1]);
+    }
+  }
+
+  return entries;
+}
+
+export function generateUploadScript(
   entries: DownloadResult[],
   savePath: string
 ): void {
@@ -228,14 +245,31 @@ function generateUploadScript(
 
   const scriptPath = `${savePath}/upload_all.ps1`;
 
+  // Read existing entries to preserve them
+  const existingEntries = parseExistingUploadScript(scriptPath);
+
+  // Build new entries from current download
+  const newEntries: string[] = [];
+  for (const entry of successful) {
+    const fileName = entry.archiveFile.split("/").pop();
+    newEntries.push(`${fileName}|docker://docker.senjone.com/${entry.repoPath}`);
+  }
+
+  // Merge: existing + new (no duplicates)
+  const allEntries = [...existingEntries];
+  for (const newEntry of newEntries) {
+    if (!allEntries.includes(newEntry)) {
+      allEntries.push(newEntry);
+    }
+  }
+
   const lines: string[] = [
     "# 自动上传脚本 - 由 skopeo.ts 生成",
     "$images = @(",
   ];
 
-  for (const entry of successful) {
-    const fileName = entry.archiveFile.split("/").pop();
-    lines.push(`    "${fileName}|docker://docker.senjone.com/${entry.repoPath}"`);
+  for (const entry of allEntries) {
+    lines.push(`    "${entry}"`);
   }
 
   lines.push(");",
@@ -329,6 +363,7 @@ async function downloadCommand(
 
 // ── Main entry ─────────────────────────────────────────────────────────────
 
+if (import.meta.main) {
 const args = process.argv.slice(2);
 const parsed = parseArgs(args);
 
@@ -368,4 +403,5 @@ switch (parsed.command) {
     colorLog("  download <image>    下载单个 Docker 镜像", "white");
     colorLog("  compose <file>      从 compose 文件批量下载", "white");
     process.exit(1);
+}
 }
