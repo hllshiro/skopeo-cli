@@ -1,5 +1,5 @@
 {
-  "name": "skopeo",
+  "name": "skopeo-cli",
   "module": "skopeo.ts",
   "type": "module",
   "private": true,
