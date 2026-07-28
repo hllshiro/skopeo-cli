@@ -23,7 +23,16 @@ interface DownloadResult {
   imageName: string;
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────
+function getDefaultDownloadPath(): string {
+  const platform = process.platform;
+  if (platform === "win32") {
+    const userProfile = process.env.USERPROFILE;
+    if (userProfile) return `${userProfile}\\Downloads`;
+  }
+  const home = process.env.HOME;
+  if (home) return `${home}/Downloads`;
+  return `${process.cwd()}/Downloads`;
+}
 
 function parseArgs(
   args: string[]
@@ -153,16 +162,48 @@ async function downloadImage(
   colorLog(`正在下载镜像: ${image}...`, "green");
   let proc;
   try {
-    proc = Bun.spawnSync(["skopeo", ...skopeoArgs]);
+    proc = Bun.spawn(["skopeo", ...skopeoArgs], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
   } catch (e: any) {
     colorLog(`skopeo 未安装或不在 PATH 中: ${e.message}`, "red");
     return { success: false, archiveFile, repoPath, imageName: image };
   }
 
-  if (proc.exitCode !== 0) {
+  // Stream stdout and stderr for real-time progress
+  const decoder = new TextDecoder();
+  let stderrOutput = "";
+
+  const streamOutput = async (stream: ReadableStream, toStderr: boolean) => {
+    const reader = stream.getReader();
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const text = decoder.decode(value, { stream: true });
+        if (toStderr) {
+          stderrOutput += text;
+          process.stderr.write(text);
+        } else {
+          process.stdout.write(text);
+        }
+      }
+    } catch {
+      // Stream may already be closed
+    }
+  };
+
+  await Promise.all([
+    streamOutput(proc.stdout, false),
+    streamOutput(proc.stderr, true),
+  ]);
+
+  const exitCode = await proc.exited;
+
+  if (exitCode !== 0) {
     colorLog(`下载镜像失败: ${image}`, "red");
-    const errMsg = new TextDecoder().decode(proc.stderr);
-    if (errMsg) colorLog(errMsg, "red");
+    if (stderrOutput) colorLog(stderrOutput, "red");
     // Clean up partial file
     if (existsSync(archiveFile)) {
       unlinkSync(archiveFile);
@@ -265,7 +306,7 @@ async function downloadCommand(
   opts: DownloadOptions
 ): Promise<void> {
   // Default save path
-  const savePath = opts.savePath || `${process.env.HOME || process.cwd()}/Downloads/docker`;
+  const savePath = opts.savePath || getDefaultDownloadPath();
   const effectiveOpts = { ...opts, savePath };
 
   // Ensure directory exists
