@@ -112,7 +112,7 @@ function parseComposeFile(filePath: string, filter?: string): string[] {
   for (const line of text.split("\n")) {
     const match = line.match(imageRegex);
     if (match?.groups?.image) {
-      const img = match.groups.image.replace(/['"]/, "");
+      const img = match.groups.image.replace(/['"]/g, "");
       allImages.push(img);
     }
   }
@@ -198,11 +198,6 @@ async function composeCommand(
   file: string,
   opts: ComposeOptions
 ): Promise<void> {
-  if (!existsSync(file)) {
-    colorLog(`错误: 找不到文件 ${file}`, "red");
-    process.exit(1);
-  }
-
   colorLog(`正在解析 ${file} ...`, "cyan");
   const images = parseComposeFile(file, opts.filter);
 
@@ -211,7 +206,7 @@ async function composeCommand(
     return;
   }
 
-  const savePath = opts.savePath || `${process.env.HOME}/Downloads/docker`;
+  const savePath = opts.savePath || `${process.env.HOME || process.cwd()}/Downloads/docker`;
   const effectiveOpts = { ...opts, savePath };
 
   ensureDir(savePath);
@@ -233,7 +228,13 @@ async function composeCommand(
     console.log("--------------------------------------------------");
   }
 
-  colorLog("所有镜像调用任务结束！", "green");
+  const succeeded = results.filter((r) => r.success).length;
+  const failed = results.length - succeeded;
+  if (failed > 0) {
+    colorLog(`全部完成！成功: ${succeeded}, 失败: ${failed}`, "yellow");
+  } else {
+    colorLog("全部上传完成！", "green");
+  }
 
   if (!opts.noUploadScript) {
     generateUploadScript(results, savePath);
@@ -245,7 +246,7 @@ async function downloadCommand(
   opts: DownloadOptions
 ): Promise<void> {
   // Default save path
-  const savePath = opts.savePath || `${process.env.HOME}/Downloads/docker`;
+  const savePath = opts.savePath || `${process.env.HOME || process.cwd()}/Downloads/docker`;
   const effectiveOpts = { ...opts, savePath };
 
   // Ensure directory exists
