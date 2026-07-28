@@ -1,4 +1,6 @@
-# skopeo
+[![简体中文](https://img.shields.io/badge/简体中文-readme-blue)](README.zh-CN.md)
+
+# skopeo-cli
 
 A CLI tool for downloading and composing Docker container images using [skopeo](https://github.com/containers/skopeo).
 
@@ -91,6 +93,16 @@ This will automatically build and publish binaries for:
 ## Generated Upload Script
 
 After downloading images, an `upload_all.ps1` PowerShell script is generated that can push all downloaded images to a private registry (e.g., `docker.senjone.com`).
+
+## Legacy Scripts
+
+The `legacy/` directory contains the original PowerShell scripts that this tool replaces:
+
+- `skopeo-download.ps1` — Original download script
+- `skopeo-compose.ps1` — Original compose script
+- `skopeo-common.ps1` — Shared utilities
+
+These are kept for reference only and are no longer maintained.
 
 ## License
 
