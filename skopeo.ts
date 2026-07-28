@@ -86,17 +86,6 @@ function ensureDir(path: string): void {
   mkdirSync(path, { recursive: true });
 }
 
-function confirmOverwrite(filePath: string, force?: boolean): boolean {
-  if (!existsSync(filePath)) {
-    return false;
-  }
-  if (force) {
-    return true;
-  }
-  colorLog(`文件已存在，跳过（使用 --overwrite 覆盖）: ${filePath}`, "yellow");
-  return false;
-}
-
 // ── Core logic ─────────────────────────────────────────────────────────────
 
 function parseComposeFile(filePath: string, filter?: string): string[] {
@@ -263,7 +252,7 @@ async function composeCommand(
   if (failed > 0) {
     colorLog(`全部完成！成功: ${succeeded}, 失败: ${failed}`, "yellow");
   } else {
-    colorLog("全部上传完成！", "green");
+    colorLog("全部下载完成！", "green");
   }
 
   if (!opts.noUploadScript) {
