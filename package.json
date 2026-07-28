@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "start": "bun run skopeo.ts",
-    "build": "bun build skopeo.ts --compile --outfile skopeo-cli.exe"
+    "build": "bun build skopeo.ts --compile"
   },
   "devDependencies": {
     "@types/bun": "latest"
