@@ -4,6 +4,12 @@
 
 A CLI tool for downloading and composing Docker container images using [skopeo](https://github.com/containers/skopeo).
 
+## Background
+
+This tool is designed for air-gapped environments where you need to download container images from public registries (Docker Hub, GitHub Container Registry, etc.) and upload them to an offline repository on your intranet. It supports multi-architecture images (linux/amd64, linux/arm64, etc.), making it ideal for hybrid infrastructure environments.
+
+For setting up a private container registry, we recommend [zot](https://github.com/project-zot/zot) — a native, OCI-compatible registry with minimal resource requirements.
+
 ## Features
 
 - **Download** single Docker images from registries

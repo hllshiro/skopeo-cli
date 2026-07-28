@@ -4,6 +4,12 @@
 
 一个使用 [skopeo](https://github.com/containers/skopeo) 下载和合成 Docker 容器镜像的命令行工具。
 
+## 项目背景
+
+本工具专为离线/内网环境设计，用于从公共仓库（Docker Hub、GitHub Container Registry 等）下载容器镜像，然后上传到内网的离线仓库。支持多架构镜像（linux/amd64、linux/arm64 等），适用于混合架构基础设施环境。
+
+推荐使用 [zot](https://github.com/project-zot/zot) 搭建私有容器仓库 —— 一个原生 OCI 兼容的仓库，资源占用极低。
+
 ## 功能特性
 
 - **下载** 单个 Docker 镜像
