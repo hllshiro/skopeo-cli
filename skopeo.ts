@@ -189,7 +189,37 @@ function generateUploadScript(
   entries: DownloadResult[],
   savePath: string
 ): void {
-  // TODO: implement upload script generation
+  const successful = entries.filter((e) => e.success);
+  if (successful.length === 0) return;
+
+  const scriptPath = `${savePath}/upload_all.ps1`;
+
+  const lines: string[] = [
+    "# 自动上传脚本 - 由 skopeo.ts 生成",
+    "$images = @(",
+  ];
+
+  for (const entry of successful) {
+    const fileName = entry.archiveFile.split("/").pop();
+    lines.push(`    "${fileName}|docker://docker.senjone.com/${entry.repoPath}"`);
+  }
+
+  lines.push(");",
+    "",
+    "for ($i = 0; $i -lt $images.Count; $i++) {",
+    "    $parts = $images[$i] -split '\\|'",
+    "    Write-Host \"[$($i+1)/$($images.Count)] 正在上传: $($parts[0]) ...\" -ForegroundColor Cyan",
+    "    skopeo copy --all \"oci-archive:$($parts[0])\" $parts[1]",
+    "    if ($LASTEXITCODE -ne 0) {",
+    "        Write-Host \"上传失败: $($parts[0])\" -ForegroundColor Red",
+    "    }",
+    "}",
+    "Write-Host \"全部上传完成！\" -ForegroundColor Green",
+  );
+
+  const scriptContent = lines.join("\n");
+  Bun.write(scriptPath, scriptContent);
+  colorLog(`已生成上传脚本: ${scriptPath}`, "green");
 }
 
 // ── Commands ───────────────────────────────────────────────────────────────
