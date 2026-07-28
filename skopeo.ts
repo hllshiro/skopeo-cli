@@ -92,7 +92,11 @@ function colorLog(msg: string, color: string): void {
 }
 
 function ensureDir(path: string): void {
-  mkdirSync(path, { recursive: true });
+  try {
+    mkdirSync(path, { recursive: true });
+  } catch (e: any) {
+    if (e.code !== "EEXIST") throw e;
+  }
 }
 
 // ── Core logic ─────────────────────────────────────────────────────────────
