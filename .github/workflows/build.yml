@@ -41,7 +41,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: skopeo-windows
-          path: skopeo.exe
+          path: skopeo-cli.exe
 
   build-linux:
     if: >-
@@ -63,7 +63,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: skopeo-linux
-          path: skopeo
+          path: skopeo-cli
 
   build-macos:
     if: >-
@@ -85,7 +85,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: skopeo-macos
-          path: skopeo
+          path: skopeo-cli
 
   release:
     if: startsWith(github.ref, 'refs/tags/')
@@ -100,8 +100,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            artifacts/skopeo-windows/skopeo.exe
-            artifacts/skopeo-linux/skopeo
-            artifacts/skopeo-macos/skopeo
+            artifacts/skopeo-windows/skopeo-cli.exe
+            artifacts/skopeo-linux/skopeo-cli
+            artifacts/skopeo-macos/skopeo-cli
           draft: false
           prerelease: false
