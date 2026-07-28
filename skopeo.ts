@@ -266,7 +266,7 @@ async function composeCommand(
     return;
   }
 
-  const savePath = opts.savePath || `${process.env.HOME || process.cwd()}/Downloads/docker`;
+  const savePath = opts.savePath || getDefaultDownloadPath();
   const effectiveOpts = { ...opts, savePath };
 
   ensureDir(savePath);
@@ -317,6 +317,9 @@ async function downloadCommand(
 
   if (result.success) {
     colorLog(`已记录: ${image} → docker.senjone.com/${result.repoPath}`, "green");
+    if (!opts.noUploadScript) {
+      generateUploadScript([result], savePath);
+    }
   }
 }
 
