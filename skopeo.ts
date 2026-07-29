@@ -7,6 +7,7 @@ interface DownloadOptions {
   platform?: string;
   overwrite: boolean;
   noUploadScript: boolean;
+  registry: string;
 }
 
 interface ComposeOptions {
@@ -14,6 +15,7 @@ interface ComposeOptions {
   filter?: string;
   overwrite: boolean;
   noUploadScript: boolean;
+  registry: string;
 }
 
 interface DownloadResult {
@@ -282,7 +284,8 @@ export function parseExistingUploadScript(scriptPath: string): string[] {
 export function generateUploadScript(
   entries: DownloadResult[],
   targetDir: string,
-  skopeoPath: string | null
+  skopeoPath: string | null,
+  registry: string
 ): void {
   const successful = entries.filter((e) => e.success);
   if (successful.length === 0) return;
@@ -296,7 +299,7 @@ export function generateUploadScript(
   const newEntries: string[] = [];
   for (const entry of successful) {
     const fileName = entry.archiveFile.split("/").pop();
-    newEntries.push(`${fileName}|docker://docker.senjone.com/${entry.repoPath}`);
+    newEntries.push(`${fileName}|docker://${registry}/${entry.repoPath}`);
   }
 
   // Merge: existing + new (no duplicates)
@@ -404,7 +407,7 @@ async function composeCommand(
   }
 
   if (!opts.noUploadScript) {
-    generateUploadScript(results, outputDir, isWin ? skopeoPath : null);
+    generateUploadScript(results, outputDir, isWin ? skopeoPath : null, opts.registry);
   }
 
   colorLog(`Output directory: ${outputDir}`, "cyan");
@@ -440,9 +443,9 @@ async function downloadCommand(
   const result = await downloadImage(image, effectiveOpts);
 
   if (result.success) {
-    colorLog(`Recorded: ${image} -> docker.senjone.com/${result.repoPath}`, "green");
+    colorLog(`Recorded: ${image} -> ${opts.registry}/${result.repoPath}`, "green");
     if (!opts.noUploadScript) {
-      generateUploadScript([result], outputDir, isWin ? skopeoPath : null);
+      generateUploadScript([result], outputDir, isWin ? skopeoPath : null, opts.registry);
     }
   }
 
@@ -467,6 +470,7 @@ switch (parsed.command) {
       platform: parsed.options.platform as string | undefined,
       overwrite: !!parsed.options.overwrite,
       noUploadScript: !!parsed.options["no-upload-script"],
+      registry: (parsed.options.registry as string) || "docker.senjone.com",
     };
     await downloadCommand(image, opts);
     break;
@@ -482,6 +486,7 @@ switch (parsed.command) {
       filter: parsed.options.filter as string | undefined,
       overwrite: !!parsed.options.overwrite,
       noUploadScript: !!parsed.options["no-upload-script"],
+      registry: (parsed.options.registry as string) || "docker.senjone.com",
     };
     await composeCommand(file, opts);
     break;
@@ -490,6 +495,7 @@ switch (parsed.command) {
     colorLog("Usage: skopeo-cli <download|compose> [options]", "yellow");
     colorLog("  download <image>    Download a single Docker image", "white");
     colorLog("  compose <file>      Batch download from compose file", "white");
+    colorLog("  --registry <host>   Target registry (default: docker.senjone.com)", "white");
     process.exit(1);
 }
 }
