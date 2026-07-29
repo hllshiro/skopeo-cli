@@ -16,89 +16,97 @@ For setting up a private container registry, we recommend [zot](https://github.c
 - **Compose** batch download multiple images from a compose file
 - Generates PowerShell upload scripts for pushing to private registries
 - Multi-architecture support (linux/amd64, linux/arm64, etc.)
+- Configurable target registry via `--registry` option
+- Portable output directory (`docker-image-will-upload/`) with skopeo binary included on Windows
+- Cross-platform skopeo detection and availability check
 
 ## Prerequisites
 
-- [Bun](https://bun.sh) runtime
+- [Bun](https://bun.sh) runtime (for building from source)
 - [skopeo](https://github.com/containers/skopeo) CLI installed
 
 ## Installation
 
+### Pre-built Binaries
+
+Download the latest release for your platform from [Releases](https://github.com/hllshiro/skopeo-cli/releases).
+
+### From Source
+
 ```bash
 bun install
-```
-
-## Development
-
-```bash
-# Run directly
-bun run start
-
-# Or
-bun run skopeo.ts
-```
-
-## Build
-
-```bash
 bun run build
 ```
-
-This compiles `skopeo.ts` into a standalone executable named `skopeo` (or `skopeo.exe` on Windows).
-
-### Cross-Platform Builds
-
-This project uses GitHub Actions to build for multiple platforms. Push a tag to trigger a release:
-
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
-
-This will automatically build and publish binaries for:
-- Windows (x86_64)
-- Linux (x86_64)
-- macOS (x86_64)
 
 ## Usage
 
 ### Download a single image
 
 ```bash
-./skopeo download <image> [options]
+./skopeo-cli download <image> [options]
 ```
 
 **Options:**
-- `--save <path>` — Save directory (default: `~/Downloads/docker`)
+- `--save <path>` — Save directory (default: `~/Downloads`)
 - `--platform <platform>` — Target platform (e.g., `linux/amd64`)
+- `--registry <host>` — Target registry (default: `docker.senjone.com`)
 - `--overwrite` — Overwrite existing files
 - `--no-upload-script` — Skip generating upload script
 
 **Example:**
 ```bash
-./skopeo download nginx:latest --save ./images
+./skopeo-cli download nginx:latest --save ./images --registry my-registry.example.com
 ```
 
 ### Compose batch download
 
 ```bash
-./skopeo compose <file> [options]
+./skopeo-cli compose <file> [options]
 ```
 
 **Options:**
-- `--save <path>` — Save directory (default: `~/Downloads/docker`)
+- `--save <path>` — Save directory (default: `~/Downloads`)
 - `--filter <image>` — Filter specific image to download
+- `--registry <host>` — Target registry (default: `docker.senjone.com`)
 - `--overwrite` — Overwrite existing files
 - `--no-upload-script` — Skip generating upload script
 
 **Example:**
 ```bash
-./skopeo compose docker-compose.yml --save ./images
+./skopeo-cli compose docker-compose.yml --save ./images --registry gcr.io/my-project
 ```
+
+## Output Structure
+
+All downloaded images, scripts, and (on Windows) the skopeo binary are placed in a `docker-image-will-upload/` directory under the save path:
+
+```
+~/Downloads/docker-image-will-upload/
+├── nginx-latest.tar
+├── ubuntu-latest.tar
+├── upload_all.ps1
+└── skopeo.exe          # Windows only
+```
+
+This makes it easy to migrate the entire package to another machine.
 
 ## Generated Upload Script
 
-After downloading images, an `upload_all.ps1` PowerShell script is generated that can push all downloaded images to a private registry (e.g., `docker.senjone.com`).
+After downloading images, an `upload_all.ps1` PowerShell script is generated that can push all downloaded images to the configured registry. The script uses relative paths and includes `Set-Location $PSScriptRoot` so it can be run from any location.
+
+## Cross-Platform Builds
+
+This project uses GitHub Actions to build for multiple platforms. Push a tag to trigger a release:
+
+```bash
+git tag v1.1.0
+git push origin v1.1.0
+```
+
+This will automatically build and publish binaries for:
+- Windows (x86_64)
+- Linux (x86_64)
+- macOS (x86_64)
 
 ## Legacy Scripts
 
