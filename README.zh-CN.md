@@ -25,6 +25,21 @@
 - [Bun](https://bun.sh) 运行时（从源码构建时需要）
 - [skopeo](https://github.com/containers/skopeo) CLI
 
+### Skopeo 版本要求
+
+**最低版本：1.6.0+**
+
+本工具需要 skopeo 支持 `--all` 标志（多架构镜像复制）。低于 1.6.0 的版本可能会报错：
+
+```
+unsupported MIME type for compression: application/vnd.in-toto+json
+```
+
+**已测试版本：**
+- 1.23.0（推荐）
+- 1.14.0+
+- 1.6.0+
+
 ## 安装
 
 ### 预编译二进制文件

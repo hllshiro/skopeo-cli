@@ -25,6 +25,21 @@ For setting up a private container registry, we recommend [zot](https://github.c
 - [Bun](https://bun.sh) runtime (for building from source)
 - [skopeo](https://github.com/containers/skopeo) CLI installed
 
+### Skopeo Version Requirements
+
+**Minimum version: 1.6.0+**
+
+This tool requires skopeo with support for `--all` flag (multi-architecture image copying). Versions below 1.6.0 may fail with:
+
+```
+unsupported MIME type for compression: application/vnd.in-toto+json
+```
+
+**Tested versions:**
+- 1.23.0 (recommended)
+- 1.14.0+
+- 1.6.0+
+
 ## Installation
 
 ### Pre-built Binaries

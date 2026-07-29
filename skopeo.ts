@@ -25,7 +25,7 @@ interface DownloadResult {
   imageName: string;
 }
 
-function getDefaultDownloadPath(): string {
+export function getDefaultDownloadPath(): string {
   const platform = process.platform;
   if (platform === "win32") {
     const userProfile = process.env.USERPROFILE;
@@ -36,7 +36,7 @@ function getDefaultDownloadPath(): string {
   return `${process.cwd()}/Downloads`;
 }
 
-function parseArgs(
+export function parseArgs(
   args: string[]
 ): { command: string; positional: string[]; options: Record<string, string | boolean> } {
   const positional: string[] = [];
@@ -146,10 +146,9 @@ async function copySkopeoToDir(targetDir: string): Promise<boolean> {
 
 // ── Core logic ─────────────────────────────────────────────────────────────
 
-function parseComposeFile(filePath: string, filter?: string): string[] {
+export function parseComposeFile(filePath: string, filter?: string): string[] {
   if (!existsSync(filePath)) {
-    colorLog(`Error: file not found ${filePath}`, "red");
-    process.exit(1);
+    throw new Error(`File not found: ${filePath}`);
   }
 
   const text = readFileSync(filePath, "utf-8");
@@ -174,7 +173,7 @@ function parseComposeFile(filePath: string, filter?: string): string[] {
   return unique;
 }
 
-async function downloadImage(
+export async function downloadImage(
   image: string,
   opts: DownloadOptions
 ): Promise<DownloadResult> {
