@@ -87,7 +87,7 @@ describe("generateUploadScript - append behavior", () => {
 
   test("creates new script when none exists", () => {
     const entries = [makeResult("nginx-latest.tar", "library/nginx")];
-    generateUploadScript(entries, TEST_DIR);
+    generateUploadScript(entries, TEST_DIR, null);
 
     const scriptPath = join(TEST_DIR, "upload_all.ps1");
     expect(existsSync(scriptPath)).toBe(true);
@@ -100,11 +100,11 @@ describe("generateUploadScript - append behavior", () => {
 
     // First download
     const entries1 = [makeResult("nginx-latest.tar", "library/nginx")];
-    generateUploadScript(entries1, TEST_DIR);
+    generateUploadScript(entries1, TEST_DIR, null);
 
     // Second download
     const entries2 = [makeResult("ubuntu-latest.tar", "library/ubuntu")];
-    generateUploadScript(entries2, TEST_DIR);
+    generateUploadScript(entries2, TEST_DIR, null);
 
     // Should contain both entries
     const content = readFileSync(scriptPath, "utf-8");
@@ -117,11 +117,11 @@ describe("generateUploadScript - append behavior", () => {
 
     // First download
     const entries1 = [makeResult("nginx-latest.tar", "library/nginx")];
-    generateUploadScript(entries1, TEST_DIR);
+    generateUploadScript(entries1, TEST_DIR, null);
 
     // Second download with same image
     const entries2 = [makeResult("nginx-latest.tar", "library/nginx")];
-    generateUploadScript(entries2, TEST_DIR);
+    generateUploadScript(entries2, TEST_DIR, null);
 
     // Should still have only one entry
     const content = readFileSync(scriptPath, "utf-8");
@@ -134,14 +134,14 @@ describe("generateUploadScript - append behavior", () => {
 
     // First download
     const entries1 = [makeResult("nginx-latest.tar", "library/nginx")];
-    generateUploadScript(entries1, TEST_DIR);
+    generateUploadScript(entries1, TEST_DIR, null);
 
     // Add two more
     const entries2 = [
       makeResult("ubuntu-latest.tar", "library/ubuntu"),
       makeResult("redis-alpine.tar", "library/redis:alpine"),
     ];
-    generateUploadScript(entries2, TEST_DIR);
+    generateUploadScript(entries2, TEST_DIR, null);
 
     const content = readFileSync(scriptPath, "utf-8");
     expect(content).toContain("nginx-latest.tar");

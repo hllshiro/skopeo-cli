@@ -99,11 +99,54 @@ function ensureDir(path: string): void {
   }
 }
 
+// ── Skopeo discovery ───────────────────────────────────────────────────────
+
+async function findSkopeo(): Promise<string | null> {
+  const isWin = process.platform === "win32";
+  try {
+    const proc = Bun.spawn(
+      isWin ? ["where", "skopeo"] : ["which", "skopeo"],
+      { stdout: "pipe", stderr: "pipe" }
+    );
+    const output = await new Response(proc.stdout).text();
+    const exitCode = await proc.exited;
+    if (exitCode === 0) {
+      const firstLine = output.split("\n")[0]?.trim();
+      if (firstLine) return firstLine;
+    }
+  } catch {
+    // Command not found
+  }
+  return null;
+}
+
+async function copySkopeoToDir(targetDir: string): Promise<boolean> {
+  const skopeoPath = await findSkopeo();
+  if (!skopeoPath) return false;
+
+  const isWin = process.platform === "win32";
+  const destName = isWin ? "skopeo.exe" : "skopeo";
+  const destPath = `${targetDir}/${destName}`;
+
+  if (existsSync(destPath)) return true;
+
+  try {
+    if (isWin) {
+      Bun.spawn(["cmd", "/c", "copy", skopeoPath.replace(/\//g, "\\"), destPath.replace(/\//g, "\\")]);
+    } else {
+      Bun.spawn(["cp", skopeoPath, destPath]);
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // ── Core logic ─────────────────────────────────────────────────────────────
 
 function parseComposeFile(filePath: string, filter?: string): string[] {
   if (!existsSync(filePath)) {
-    colorLog(`错误: 找不到文件 ${filePath}`, "red");
+    colorLog(`Error: file not found ${filePath}`, "red");
     process.exit(1);
   }
 
@@ -122,7 +165,7 @@ function parseComposeFile(filePath: string, filter?: string): string[] {
   const unique = [...new Set(allImages)];
 
   if (filter) {
-    colorLog(`应用过滤器: *${filter}*`, "magenta");
+    colorLog(`Applying filter: *${filter}*`, "magenta");
     return unique.filter((img) => img.includes(filter));
   }
 
@@ -149,7 +192,7 @@ async function downloadImage(
 
   // 3. Check file existence
   if (existsSync(archiveFile) && !opts.overwrite) {
-    colorLog(`文件已存在，跳过: ${archiveFile}`, "yellow");
+    colorLog(`File already exists, skipping: ${archiveFile}`, "yellow");
     return { success: true, archiveFile, repoPath, imageName: image };
   }
 
@@ -163,7 +206,7 @@ async function downloadImage(
   skopeoArgs.push(`docker://${image}`, `oci-archive:${archiveFile}`);
 
   // 5. Execute skopeo
-  colorLog(`正在下载镜像: ${image}...`, "green");
+  colorLog(`Downloading image: ${image}...`, "green");
   let proc;
   try {
     proc = Bun.spawn(["skopeo", ...skopeoArgs], {
@@ -171,7 +214,7 @@ async function downloadImage(
       stderr: "pipe",
     });
   } catch (e: any) {
-    colorLog(`skopeo 未安装或不在 PATH 中: ${e.message}`, "red");
+    colorLog(`skopeo not found or not in PATH: ${e.message}`, "red");
     return { success: false, archiveFile, repoPath, imageName: image };
   }
 
@@ -206,7 +249,7 @@ async function downloadImage(
   const exitCode = await proc.exited;
 
   if (exitCode !== 0) {
-    colorLog(`下载镜像失败: ${image}`, "red");
+    colorLog(`Failed to download image: ${image}`, "red");
     if (stderrOutput) colorLog(stderrOutput, "red");
     // Clean up partial file
     if (existsSync(archiveFile)) {
@@ -215,7 +258,7 @@ async function downloadImage(
     return { success: false, archiveFile, repoPath, imageName: image };
   }
 
-  colorLog(`已下载: ${image} → ${archiveFile}`, "green");
+  colorLog(`Downloaded: ${image} -> ${archiveFile}`, "green");
   return { success: true, archiveFile, repoPath, imageName: image };
 }
 
@@ -238,12 +281,13 @@ export function parseExistingUploadScript(scriptPath: string): string[] {
 
 export function generateUploadScript(
   entries: DownloadResult[],
-  savePath: string
+  targetDir: string,
+  skopeoPath: string | null
 ): void {
   const successful = entries.filter((e) => e.success);
   if (successful.length === 0) return;
 
-  const scriptPath = `${savePath}/upload_all.ps1`;
+  const scriptPath = `${targetDir}/upload_all.ps1`;
 
   // Read existing entries to preserve them
   const existingEntries = parseExistingUploadScript(scriptPath);
@@ -263,8 +307,15 @@ export function generateUploadScript(
     }
   }
 
+  const isWin = process.platform === "win32";
+  const skopeoCmd = skopeoPath ? `"${skopeoPath}"` : "skopeo";
+
   const lines: string[] = [
-    "# 自动上传脚本 - 由 skopeo.ts 生成",
+    "# Auto-generated upload script by skopeo-cli",
+    "# Place this script in the same directory as the image files",
+    "",
+    "Set-Location $PSScriptRoot",
+    "",
     "$images = @(",
   ];
 
@@ -276,18 +327,18 @@ export function generateUploadScript(
     "",
     "for ($i = 0; $i -lt $images.Count; $i++) {",
     "    $parts = $images[$i] -split '\\|'",
-    "    Write-Host \"[$($i+1)/$($images.Count)] 正在上传: $($parts[0]) ...\" -ForegroundColor Cyan",
-    "    skopeo copy --all \"oci-archive:$($parts[0])\" $parts[1]",
+    `    Write-Host "[$($i+1)/$($images.Count)] Uploading: $($parts[0]) ..." -ForegroundColor Cyan`,
+    `    & ${skopeoCmd} copy --all "oci-archive:$($parts[0])" $parts[1]`,
     "    if ($LASTEXITCODE -ne 0) {",
-    "        Write-Host \"上传失败: $($parts[0])\" -ForegroundColor Red",
+    "        Write-Host \"Upload failed: $($parts[0])\" -ForegroundColor Red",
     "    }",
     "}",
-    "Write-Host \"全部上传完成！\" -ForegroundColor Green",
+    "Write-Host \"All uploads completed!\" -ForegroundColor Green",
   );
 
   const scriptContent = lines.join("\n");
   Bun.write(scriptPath, scriptContent);
-  colorLog(`已生成上传脚本: ${scriptPath}`, "green");
+  colorLog(`Generated upload script: ${scriptPath}`, "green");
 }
 
 // ── Commands ───────────────────────────────────────────────────────────────
@@ -296,32 +347,50 @@ async function composeCommand(
   file: string,
   opts: ComposeOptions
 ): Promise<void> {
-  colorLog(`正在解析 ${file} ...`, "cyan");
+  colorLog(`Parsing ${file} ...`, "cyan");
   const images = parseComposeFile(file, opts.filter);
 
   if (images.length === 0) {
-    colorLog("未找到任何镜像配置。", "yellow");
+    colorLog("No images found.", "yellow");
     return;
   }
 
   const savePath = opts.savePath || getDefaultDownloadPath();
-  const effectiveOpts = { ...opts, savePath };
+  const outputDir = `${savePath}/docker-image-will-upload`;
+  ensureDir(outputDir);
 
-  ensureDir(savePath);
+  // Check for skopeo availability
+  const skopeoPath = await findSkopeo();
+  if (!skopeoPath) {
+    colorLog("Error: skopeo not found. Please install skopeo first.", "red");
+    colorLog("  Windows: https://github.com/containers/skopeo/blob/main/install.md", "white");
+    colorLog("  Linux:   sudo apt install skopeo / sudo yum install skopeo", "white");
+    process.exit(1);
+  }
+  colorLog(`Found skopeo: ${skopeoPath}`, "cyan");
 
-  colorLog(`找到 ${images.length} 个匹配镜像，开始下载...`, "cyan");
+  // Copy skopeo to output directory
+  const isWin = process.platform === "win32";
+  if (isWin) {
+    colorLog("Copying skopeo to output directory...", "cyan");
+    await copySkopeoToDir(outputDir);
+  }
+
+  const effectiveOpts: DownloadOptions = { ...opts, savePath: outputDir };
+
+  colorLog(`Found ${images.length} matching images, starting download...`, "cyan");
   console.log("==================================================");
 
   const results: DownloadResult[] = [];
   for (let i = 0; i < images.length; i++) {
     const img = images[i]!;
-    colorLog(`[${i + 1}/${images.length}] 准备处理: ${img}`, "cyan");
+    colorLog(`[${i + 1}/${images.length}] Processing: ${img}`, "cyan");
 
     const result = await downloadImage(img, effectiveOpts);
     results.push(result);
 
     if (!result.success) {
-      colorLog(`警告: ${img} 下载失败。`, "yellow");
+      colorLog(`Warning: ${img} download failed.`, "yellow");
     }
     console.log("--------------------------------------------------");
   }
@@ -329,36 +398,55 @@ async function composeCommand(
   const succeeded = results.filter((r) => r.success).length;
   const failed = results.length - succeeded;
   if (failed > 0) {
-    colorLog(`全部完成！成功: ${succeeded}, 失败: ${failed}`, "yellow");
+    colorLog(`Done! Success: ${succeeded}, Failed: ${failed}`, "yellow");
   } else {
-    colorLog("全部下载完成！", "green");
+    colorLog("All downloads completed!", "green");
   }
 
   if (!opts.noUploadScript) {
-    generateUploadScript(results, savePath);
+    generateUploadScript(results, outputDir, isWin ? skopeoPath : null);
   }
+
+  colorLog(`Output directory: ${outputDir}`, "cyan");
 }
 
 async function downloadCommand(
   image: string,
   opts: DownloadOptions
 ): Promise<void> {
-  // Default save path
   const savePath = opts.savePath || getDefaultDownloadPath();
-  const effectiveOpts = { ...opts, savePath };
+  const outputDir = `${savePath}/docker-image-will-upload`;
+  ensureDir(outputDir);
 
-  // Ensure directory exists
-  ensureDir(savePath);
+  // Check for skopeo availability
+  const skopeoPath = await findSkopeo();
+  if (!skopeoPath) {
+    colorLog("Error: skopeo not found. Please install skopeo first.", "red");
+    colorLog("  Windows: https://github.com/containers/skopeo/blob/main/install.md", "white");
+    colorLog("  Linux:   sudo apt install skopeo / sudo yum install skopeo", "white");
+    process.exit(1);
+  }
+  colorLog(`Found skopeo: ${skopeoPath}`, "cyan");
 
-  // Download
+  // Copy skopeo to output directory
+  const isWin = process.platform === "win32";
+  if (isWin) {
+    colorLog("Copying skopeo to output directory...", "cyan");
+    await copySkopeoToDir(outputDir);
+  }
+
+  const effectiveOpts: DownloadOptions = { ...opts, savePath: outputDir };
+
   const result = await downloadImage(image, effectiveOpts);
 
   if (result.success) {
-    colorLog(`已记录: ${image} → docker.senjone.com/${result.repoPath}`, "green");
+    colorLog(`Recorded: ${image} -> docker.senjone.com/${result.repoPath}`, "green");
     if (!opts.noUploadScript) {
-      generateUploadScript([result], savePath);
+      generateUploadScript([result], outputDir, isWin ? skopeoPath : null);
     }
   }
+
+  colorLog(`Output directory: ${outputDir}`, "cyan");
 }
 
 // ── Main entry ─────────────────────────────────────────────────────────────
@@ -371,7 +459,7 @@ switch (parsed.command) {
   case "download": {
     const image = parsed.positional[0];
     if (!image) {
-      colorLog("用法: skopeo.ts download <image>", "yellow");
+      colorLog("Usage: skopeo-cli download <image>", "yellow");
       process.exit(1);
     }
     const opts: DownloadOptions = {
@@ -386,7 +474,7 @@ switch (parsed.command) {
   case "compose": {
     const file = parsed.positional[0];
     if (!file) {
-      colorLog("用法: skopeo.ts compose <file>", "yellow");
+      colorLog("Usage: skopeo-cli compose <file>", "yellow");
       process.exit(1);
     }
     const opts: ComposeOptions = {
@@ -399,9 +487,9 @@ switch (parsed.command) {
     break;
   }
   default:
-    colorLog("用法: skopeo.ts <download|compose> [options]", "yellow");
-    colorLog("  download <image>    下载单个 Docker 镜像", "white");
-    colorLog("  compose <file>      从 compose 文件批量下载", "white");
+    colorLog("Usage: skopeo-cli <download|compose> [options]", "yellow");
+    colorLog("  download <image>    Download a single Docker image", "white");
+    colorLog("  compose <file>      Batch download from compose file", "white");
     process.exit(1);
 }
 }
