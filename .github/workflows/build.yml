@@ -72,6 +72,7 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
+          body_path: .github/RELEASE_NOTES.md
           files: |
             artifacts/skopeo-linux
             artifacts/skopeo-cli.exe
