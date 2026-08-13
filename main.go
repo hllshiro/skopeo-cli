@@ -36,7 +36,14 @@ func main() {
 		return
 	}
 	if parsed.Command == "help" || cli.HasFlag(parsed.Options, "help") {
-		printUsage()
+		switch parsed.Command {
+		case "download":
+			printDownloadUsage()
+		case "compose":
+			printComposeUsage()
+		default:
+			printUsage()
+		}
 		return
 	}
 
@@ -66,18 +73,72 @@ func parseOptions(o map[string]string) options {
 	}
 }
 
+const usageText = `skopeo-cli - download Docker images and generate offline upload scripts
+
+Usage:
+  skopeo-cli <command> [options]
+
+Commands:
+  download <image>    Download a single Docker image
+  compose <file>      Batch download images from a compose file
+
+Options:
+  --save <path>           Save directory (default: ~/Downloads)
+  --platform <os/arch>    Target platform (default: all)
+  --registry <host>       Target registry (default: docker.senjone.com)
+  --overwrite             Overwrite existing files
+  --no-upload-script      Skip generating the upload script
+
+compose options:
+  --filter <keyword>      Only download images containing the keyword
+
+Other:
+  --help                  Show this help
+  --version               Show version
+`
+
+const downloadUsageText = `Usage: skopeo-cli download <image> [options]
+
+Download a single Docker image to an oci-archive tarball.
+
+Options:
+  --save <path>           Save directory (default: ~/Downloads)
+  --platform <os/arch>    Target platform (default: all)
+  --registry <host>       Target registry (default: docker.senjone.com)
+  --overwrite             Overwrite existing files
+  --no-upload-script      Skip generating the upload script
+`
+
+const composeUsageText = `Usage: skopeo-cli compose <file> [options]
+
+Batch download images referenced by a docker-compose file.
+
+Options:
+  --save <path>           Save directory (default: ~/Downloads)
+  --platform <os/arch>    Target platform (default: all)
+  --filter <keyword>      Only download images containing the keyword
+  --registry <host>       Target registry (default: docker.senjone.com)
+  --overwrite             Overwrite existing files
+  --no-upload-script      Skip generating the upload script
+`
+
 func printUsage() {
-	console.ColorLog("Usage: skopeo-cli <download|compose> [options]", "yellow")
-	console.ColorLog("  download <image>    Download a single Docker image", "white")
-	console.ColorLog("  compose <file>      Batch download from compose file", "white")
-	console.ColorLog("  --registry <host>   Target registry (default: docker.senjone.com)", "white")
+	fmt.Print(usageText)
+}
+
+func printDownloadUsage() {
+	fmt.Print(downloadUsageText)
+}
+
+func printComposeUsage() {
+	fmt.Print(composeUsageText)
 }
 
 var errUsage = errors.New("usage error")
 
 func downloadCommand(positional []string, opts options) error {
 	if len(positional) == 0 {
-		console.ColorLog("Usage: skopeo-cli download <image>", "yellow")
+		printDownloadUsage()
 		return errUsage
 	}
 	image := positional[0]
@@ -115,7 +176,7 @@ func downloadCommand(positional []string, opts options) error {
 
 func composeCommand(positional []string, opts options) error {
 	if len(positional) == 0 {
-		console.ColorLog("Usage: skopeo-cli compose <file>", "yellow")
+		printComposeUsage()
 		return errUsage
 	}
 	file := positional[0]
