@@ -1,0 +1,100 @@
+version: '3'
+
+vars:
+  FLAGS: -ldflags="-s -w"
+
+tasks:
+
+  # ── dev ────────────────────────────────────────────────
+
+  cli:
+    desc: Run skopeo-cli from source
+    cmds:
+      - go run . {{.CLI_ARGS}}
+
+  # ── build: native ──────────────────────────────────────
+
+  build:
+    desc: Build for current platform
+    cmds:
+      - go build {{.FLAGS}} -o dist/skopeo-cli{{exeExt}} .
+
+  # ── build: all ─────────────────────────────────────────
+
+  build:all:
+    desc: Build for all platforms
+    deps:
+      - build:linux:x64
+      - build:linux:arm64
+      - build:win:x64
+      - build:win:arm64
+      - build:mac:x64
+      - build:mac:arm64
+
+  # ── build: linux ───────────────────────────────────────
+
+  build:linux:x64:
+    desc: Build for linux/amd64
+    env: {GOOS: linux, GOARCH: amd64, CGO_ENABLED: '0'}
+    cmds:
+      - go build {{.FLAGS}} -o dist/skopeo-cli-linux-x64 .
+
+  build:linux:arm64:
+    desc: Build for linux/arm64
+    env: {GOOS: linux, GOARCH: arm64, CGO_ENABLED: '0'}
+    cmds:
+      - go build {{.FLAGS}} -o dist/skopeo-cli-linux-arm64 .
+
+  # ── build: windows ─────────────────────────────────────
+
+  build:win:x64:
+    desc: Build for windows/amd64
+    env: {GOOS: windows, GOARCH: amd64, CGO_ENABLED: '0'}
+    cmds:
+      - go build {{.FLAGS}} -o dist/skopeo-cli-win-x64.exe .
+
+  build:win:arm64:
+    desc: Build for windows/arm64
+    env: {GOOS: windows, GOARCH: arm64, CGO_ENABLED: '0'}
+    cmds:
+      - go build {{.FLAGS}} -o dist/skopeo-cli-win-arm64.exe .
+
+  # ── build: macos ───────────────────────────────────────
+
+  build:mac:x64:
+    desc: Build for darwin/amd64
+    env: {GOOS: darwin, GOARCH: amd64, CGO_ENABLED: '0'}
+    cmds:
+      - go build {{.FLAGS}} -o dist/skopeo-cli-mac-x64 .
+
+  build:mac:arm64:
+    desc: Build for darwin/arm64
+    env: {GOOS: darwin, GOARCH: arm64, CGO_ENABLED: '0'}
+    cmds:
+      - go build {{.FLAGS}} -o dist/skopeo-cli-mac-arm64 .
+
+  # ── tools ──────────────────────────────────────────────
+
+  test:
+    desc: Run tests
+    cmds:
+      - go test ./...
+
+  vet:
+    desc: Run go vet
+    cmds:
+      - go vet ./...
+
+  fmt:
+    desc: Format code
+    cmds:
+      - gofmt -w .
+
+  check:
+    desc: Run vet + test
+    deps: [vet, test]
+
+  tidy:
+    desc: Tidy go modules
+    cmds:
+      - go mod tidy
