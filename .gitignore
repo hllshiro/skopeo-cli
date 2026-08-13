@@ -4,3 +4,5 @@ skopeo-cli
 skopeo-cli.exe
 node_modules/
 bun.lock
+
+.codegraph/
