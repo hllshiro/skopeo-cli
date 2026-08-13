@@ -7,6 +7,7 @@ import {
   parseComposeFile,
   parseExistingUploadScript,
   generateUploadScript,
+  uploadScriptSkopeoCmd,
   downloadImage,
 } from "./skopeo";
 
@@ -497,6 +498,16 @@ describe("generateUploadScript", () => {
     const scriptPath = join(TEST_DIR, "upload_all.ps1");
     const content = readFileSync(scriptPath, "utf-8");
     expect(content).toContain("/usr/local/bin/skopeo");
+  });
+
+  test("references bundled skopeo.exe in the script directory on Windows", () => {
+    expect(uploadScriptSkopeoCmd(null, true)).toBe('"$PSScriptRoot\\skopeo.exe"');
+    expect(uploadScriptSkopeoCmd("D:\\tools\\skopeo.exe", true)).toBe('"$PSScriptRoot\\skopeo.exe"');
+  });
+
+  test("uses custom path or PATH skopeo on non-Windows", () => {
+    expect(uploadScriptSkopeoCmd("/usr/local/bin/skopeo", false)).toBe('"/usr/local/bin/skopeo"');
+    expect(uploadScriptSkopeoCmd(null, false)).toBe("skopeo");
   });
 });
 

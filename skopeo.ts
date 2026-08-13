@@ -280,6 +280,11 @@ export function parseExistingUploadScript(scriptPath: string): string[] {
   return entries;
 }
 
+export function uploadScriptSkopeoCmd(skopeoPath: string | null, isWin: boolean): string {
+  if (isWin) return '"$PSScriptRoot\\skopeo.exe"';
+  return skopeoPath ? `"${skopeoPath}"` : "skopeo";
+}
+
 export function generateUploadScript(
   entries: DownloadResult[],
   targetDir: string,
@@ -309,8 +314,7 @@ export function generateUploadScript(
     }
   }
 
-  const isWin = process.platform === "win32";
-  const skopeoCmd = skopeoPath ? `"${skopeoPath}"` : "skopeo";
+  const skopeoCmd = uploadScriptSkopeoCmd(skopeoPath, process.platform === "win32");
 
   const lines: string[] = [
     "# Auto-generated upload script by skopeo-cli",
