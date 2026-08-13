@@ -1,7 +1,7 @@
-skopeo
-skopeo.exe
-skopeo-cli
-skopeo-cli.exe
+/skopeo
+/skopeo.exe
+/skopeo-cli
+/skopeo-cli.exe
 
 .codegraph/
 backup-ts/
