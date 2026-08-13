@@ -1,136 +1,137 @@
-[![简体中文](https://img.shields.io/badge/简体中文-readme-blue)](README.zh-CN.md)
+[![English](https://img.shields.io/badge/English-readme-blue)](README.en-US.md)
 
 # skopeo-cli
 
-A CLI tool for downloading and composing Docker container images using [skopeo](https://github.com/containers/skopeo).
+一个使用 [skopeo](https://github.com/containers/skopeo) 下载和合成 Docker 容器镜像的命令行工具。
 
-## Background
+## 项目背景
 
-This tool is designed for air-gapped environments where you need to download container images from public registries (Docker Hub, GitHub Container Registry, etc.) and upload them to an offline repository on your intranet. It supports multi-architecture images (linux/amd64, linux/arm64, etc.), making it ideal for hybrid infrastructure environments.
+本工具专为离线/内网环境设计，用于从公共仓库（Docker Hub、GitHub Container Registry 等）下载容器镜像，然后上传到内网的离线仓库。支持多架构镜像（linux/amd64、linux/arm64 等），适用于混合架构基础设施环境。
 
-For setting up a private container registry, we recommend [zot](https://github.com/project-zot/zot) — a native, OCI-compatible registry with minimal resource requirements.
+推荐使用 [zot](https://github.com/project-zot/zot) 搭建私有容器仓库 —— 一个原生 OCI 兼容的仓库，资源占用极低。
 
-## Features
+## 功能特性
 
-- **Download** single Docker images from registries
-- **Compose** batch download multiple images from a compose file
-- Generates PowerShell upload scripts for pushing to private registries
-- Multi-architecture support (linux/amd64, linux/arm64, etc.)
-- Configurable target registry via `--registry` option
-- Portable output directory (`docker-image-will-upload/`) with skopeo binary included on Windows
-- Cross-platform skopeo detection and availability check
+- **下载** 单个 Docker 镜像
+- **合成** 从 compose 文件批量下载多个镜像
+- 生成 PowerShell 上传脚本，推送到私有仓库
+- 多架构支持 (linux/amd64, linux/arm64 等)
+- 通过 `--registry` 选项自定义目标仓库地址
+- 便携式输出目录 (`docker-image-will-upload/`)，Windows 下自动包含 skopeo 二进制文件
+- 跨平台 skopeo 检测与可用性检查
 
-## Prerequisites
+## 前置要求
 
-- [Go](https://go.dev) 1.25+ (for building from source)
-- [skopeo](https://github.com/containers/skopeo) CLI installed
+- [Go](https://go.dev) 1.25+（从源码构建时需要）
+- [skopeo](https://github.com/containers/skopeo) CLI
 
-### Skopeo Version Requirements
+### Skopeo 版本要求
 
-**Minimum version: 1.6.0+**
+**最低版本：1.6.0+**
 
-This tool requires skopeo with support for `--all` flag (multi-architecture image copying). Versions below 1.6.0 may fail with:
+本工具需要 skopeo 支持 `--all` 标志（多架构镜像复制）。低于 1.6.0 的版本可能会报错：
 
 ```
 unsupported MIME type for compression: application/vnd.in-toto+json
 ```
 
-**Tested versions:**
-- 1.23.0 (recommended)
+**已测试版本：**
+- 1.23.0（推荐）
 - 1.14.0+
 - 1.6.0+
 
-## Installation
+## 安装
 
-### Pre-built Binaries
+### 预编译二进制文件
 
-Download the latest release for your platform from [Releases](https://github.com/hllshiro/skopeo-cli/releases).
+从 [Releases](https://github.com/hllshiro/skopeo-cli/releases) 下载适合您平台的最新版本。
 
-### From Source
+### 从源码构建
 
 ```bash
 go build -o skopeo-cli .
 ```
 
-With [Task](https://taskfile.dev) installed, common commands are available as tasks:
+若安装了 [Task](https://taskfile.dev)，也可用以下任务：
 
 ```bash
-task cli -- download nginx:latest   # run from source
-task build                          # build for current platform
-task build:all                      # build for all platforms
-task test                           # run tests
+task cli -- download nginx:latest   # 从源码运行
+task build                          # 构建当前平台
+task build:all                      # 构建所有平台
+task test                           # 运行测试
 ```
 
-## Usage
+## 使用方法
 
-### Download a single image
+### 下载单个镜像
 
 ```bash
 ./skopeo-cli download <image> [options]
 ```
 
-**Options:**
-- `--save <path>` — Save directory (default: `~/Downloads`)
-- `--platform <platform>` — Target platform (e.g., `linux/amd64`)
-- `--registry <host>` — Target registry (default: `docker.senjone.com`)
-- `--overwrite` — Overwrite existing files
-- `--no-upload-script` — Skip generating upload script
+**选项：**
+- `--save <path>` — 保存目录（默认：`~/Downloads`）
+- `--platform <os/arch>` — 目标平台（默认：所有架构，如 `linux/amd64`）
+- `--registry <host>` — 目标仓库地址（默认：`docker.senjone.com`）
+- `--overwrite` — 覆盖已有文件
+- `--no-upload-script` — 跳过生成上传脚本
 
-**Example:**
+**示例：**
 ```bash
 ./skopeo-cli download nginx:latest --save ./images --registry my-registry.example.com
 ```
 
-### Compose batch download
+### 批量下载
 
 ```bash
 ./skopeo-cli compose <file> [options]
 ```
 
-**Options:**
-- `--save <path>` — Save directory (default: `~/Downloads`)
-- `--filter <image>` — Filter specific image to download
-- `--registry <host>` — Target registry (default: `docker.senjone.com`)
-- `--overwrite` — Overwrite existing files
-- `--no-upload-script` — Skip generating upload script
+**选项：**
+- `--save <path>` — 保存目录（默认：`~/Downloads`）
+- `--platform <os/arch>` — 目标平台（默认：所有架构，如 `linux/amd64`）
+- `--filter <image>` — 筛选特定镜像下载
+- `--registry <host>` — 目标仓库地址（默认：`docker.senjone.com`）
+- `--overwrite` — 覆盖已有文件
+- `--no-upload-script` — 跳过生成上传脚本
 
-**Example:**
+**示例：**
 ```bash
 ./skopeo-cli compose docker-compose.yml --save ./images --registry gcr.io/my-project
 ```
 
-## Output Structure
+## 输出目录结构
 
-All downloaded images, scripts, and (on Windows) the skopeo binary are placed in a `docker-image-will-upload/` directory under the save path:
+所有下载的镜像、脚本以及（Windows 下的）skopeo 二进制文件都放在保存路径下的 `docker-image-will-upload/` 目录中：
 
 ```
 ~/Downloads/docker-image-will-upload/
 ├── nginx-latest.tar
 ├── ubuntu-latest.tar
 ├── upload_all.ps1
-└── skopeo.exe          # Windows only
+└── skopeo.exe          # 仅 Windows
 ```
 
-This makes it easy to migrate the entire package to another machine.
+这样方便将整个包迁移到其他机器上使用。
 
-## Generated Upload Script
+## 上传脚本
 
-After downloading images, an `upload_all.ps1` PowerShell script is generated that can push all downloaded images to the configured registry. The script uses relative paths and includes `Set-Location $PSScriptRoot` so it can be run from any location.
+下载完成后会生成 `upload_all.ps1` PowerShell 脚本，可将所有镜像推送到配置的目标仓库。脚本使用相对路径并包含 `Set-Location $PSScriptRoot`，可以从任意位置运行。
 
-## Cross-Platform Builds
+## 跨平台构建
 
-This project uses GitHub Actions to build for multiple platforms. Push a tag to trigger a release:
+项目使用 GitHub Actions 为多个平台构建。推送标签触发发布：
 
 ```bash
 git tag v1.1.0
 git push origin v1.1.0
 ```
 
-This will automatically build and publish binaries for:
+自动构建并发布以下平台的二进制文件：
 - Windows (x86_64)
 - Linux (x86_64)
 - macOS (x86_64)
 
-## License
+## 许可证
 
 MIT
