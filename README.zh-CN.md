@@ -22,7 +22,7 @@
 
 ## 前置要求
 
-- [Bun](https://bun.sh) 运行时（从源码构建时需要）
+- [Go](https://go.dev) 1.25+（从源码构建时需要）
 - [skopeo](https://github.com/containers/skopeo) CLI
 
 ### Skopeo 版本要求
@@ -49,8 +49,7 @@ unsupported MIME type for compression: application/vnd.in-toto+json
 ### 从源码构建
 
 ```bash
-bun install
-bun run build
+go build -o skopeo-cli .
 ```
 
 ## 使用方法

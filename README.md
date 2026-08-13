@@ -22,7 +22,7 @@ For setting up a private container registry, we recommend [zot](https://github.c
 
 ## Prerequisites
 
-- [Bun](https://bun.sh) runtime (for building from source)
+- [Go](https://go.dev) 1.25+ (for building from source)
 - [skopeo](https://github.com/containers/skopeo) CLI installed
 
 ### Skopeo Version Requirements
@@ -49,8 +49,7 @@ Download the latest release for your platform from [Releases](https://github.com
 ### From Source
 
 ```bash
-bun install
-bun run build
+go build -o skopeo-cli .
 ```
 
 ## Usage
