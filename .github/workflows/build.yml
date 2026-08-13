@@ -5,17 +5,6 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
-    inputs:
-      platform:
-        description: 'Target platform'
-        required: false
-        default: 'all'
-        type: choice
-        options:
-          - all
-          - windows
-          - linux
-          - macos
 
 permissions:
   contents: write
@@ -32,34 +21,7 @@ jobs:
 
       - run: go test ./...
 
-  build-windows:
-    if: >-
-      github.event_name == 'push' ||
-      github.event.inputs.platform == 'all' ||
-      github.event.inputs.platform == 'windows'
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.25'
-
-      - name: Build
-        run: go build -trimpath -ldflags "-s -w" -o skopeo-cli.exe .
-        env:
-          CGO_ENABLED: 0
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: skopeo-windows
-          path: skopeo-cli.exe
-
-  build-linux:
-    if: >-
-      github.event_name == 'push' ||
-      github.event.inputs.platform == 'all' ||
-      github.event.inputs.platform == 'linux'
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -68,54 +30,51 @@ jobs:
         with:
           go-version: '1.25'
 
-      - name: Build
+      - name: Build Linux
         run: go build -trimpath -ldflags "-s -w" -o skopeo-linux .
         env:
+          GOOS: linux
+          GOARCH: amd64
           CGO_ENABLED: 0
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: skopeo-linux
-          path: skopeo-linux
+      - name: Build Windows
+        run: go build -trimpath -ldflags "-s -w" -o skopeo-cli.exe .
+        env:
+          GOOS: windows
+          GOARCH: amd64
+          CGO_ENABLED: 0
 
-  build-macos:
-    if: >-
-      github.event_name == 'push' ||
-      github.event.inputs.platform == 'all' ||
-      github.event.inputs.platform == 'macos'
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.25'
-
-      - name: Build
+      - name: Build macOS
         run: go build -trimpath -ldflags "-s -w" -o skopeo-macos .
         env:
+          GOOS: darwin
+          GOARCH: amd64
           CGO_ENABLED: 0
 
       - uses: actions/upload-artifact@v4
         with:
-          name: skopeo-macos
-          path: skopeo-macos
+          name: skopeo-binaries
+          path: |
+            skopeo-linux
+            skopeo-cli.exe
+            skopeo-macos
 
   release:
     if: startsWith(github.ref, 'refs/tags/')
-    needs: [test, build-windows, build-linux, build-macos]
+    needs: [test, build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
         with:
+          name: skopeo-binaries
           path: artifacts
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            artifacts/skopeo-windows/skopeo-cli.exe
-            artifacts/skopeo-linux/skopeo-linux
-            artifacts/skopeo-macos/skopeo-macos
+            artifacts/skopeo-linux
+            artifacts/skopeo-cli.exe
+            artifacts/skopeo-macos
           draft: false
           prerelease: false
