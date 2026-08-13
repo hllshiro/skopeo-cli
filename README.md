@@ -52,6 +52,15 @@ Download the latest release for your platform from [Releases](https://github.com
 go build -o skopeo-cli .
 ```
 
+With [Task](https://taskfile.dev) installed, common commands are available as tasks:
+
+```bash
+task cli -- download nginx:latest   # run from source
+task build                          # build for current platform
+task build:all                      # build for all platforms
+task test                           # run tests
+```
+
 ## Usage
 
 ### Download a single image
@@ -121,16 +130,6 @@ This will automatically build and publish binaries for:
 - Windows (x86_64)
 - Linux (x86_64)
 - macOS (x86_64)
-
-## Legacy Scripts
-
-The `legacy/` directory contains the original PowerShell scripts that this tool replaces:
-
-- `skopeo-download.ps1` — Original download script
-- `skopeo-compose.ps1` — Original compose script
-- `skopeo-common.ps1` — Shared utilities
-
-These are kept for reference only and are no longer maintained.
 
 ## License
 

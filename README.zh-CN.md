@@ -52,6 +52,15 @@ unsupported MIME type for compression: application/vnd.in-toto+json
 go build -o skopeo-cli .
 ```
 
+若安装了 [Task](https://taskfile.dev)，也可用以下任务：
+
+```bash
+task cli -- download nginx:latest   # 从源码运行
+task build                          # 构建当前平台
+task build:all                      # 构建所有平台
+task test                           # 运行测试
+```
+
 ## 使用方法
 
 ### 下载单个镜像
@@ -121,16 +130,6 @@ git push origin v1.1.0
 - Windows (x86_64)
 - Linux (x86_64)
 - macOS (x86_64)
-
-## 旧版脚本
-
-`legacy/` 目录包含本工具替代的原始 PowerShell 脚本：
-
-- `skopeo-download.ps1` — 原下载脚本
-- `skopeo-compose.ps1` — 原合成脚本
-- `skopeo-common.ps1` — 共享工具函数
-
-仅供参考，不再维护。
 
 ## 许可证
 
