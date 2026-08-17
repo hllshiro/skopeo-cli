@@ -3,7 +3,6 @@ package upload
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -93,7 +92,7 @@ func TestParseExistingUploadScriptEmpty(t *testing.T) {
 
 func TestGenerateUploadScriptNew(t *testing.T) {
 	dir := t.TempDir()
-	GenerateUploadScript([]skopeo.DownloadResult{makeResult(dir, "nginx-latest.tar", "library/nginx")}, dir, "", "docker.senjone.com")
+	GenerateUploadScript([]skopeo.DownloadResult{makeResult(dir, "nginx-latest.tar", "library/nginx")}, dir, "docker.senjone.com")
 
 	content, ok := readScript(t, dir)
 	if !ok {
@@ -109,8 +108,8 @@ func TestGenerateUploadScriptNew(t *testing.T) {
 
 func TestGenerateUploadScriptAppends(t *testing.T) {
 	dir := t.TempDir()
-	GenerateUploadScript([]skopeo.DownloadResult{makeResult(dir, "nginx-latest.tar", "library/nginx")}, dir, "", "docker.senjone.com")
-	GenerateUploadScript([]skopeo.DownloadResult{makeResult(dir, "ubuntu-latest.tar", "library/ubuntu")}, dir, "", "docker.senjone.com")
+	GenerateUploadScript([]skopeo.DownloadResult{makeResult(dir, "nginx-latest.tar", "library/nginx")}, dir, "docker.senjone.com")
+	GenerateUploadScript([]skopeo.DownloadResult{makeResult(dir, "ubuntu-latest.tar", "library/ubuntu")}, dir, "docker.senjone.com")
 
 	content, _ := readScript(t, dir)
 	if !strings.Contains(content, "nginx-latest.tar") {
@@ -123,8 +122,8 @@ func TestGenerateUploadScriptAppends(t *testing.T) {
 
 func TestGenerateUploadScriptNoDuplicates(t *testing.T) {
 	dir := t.TempDir()
-	GenerateUploadScript([]skopeo.DownloadResult{makeResult(dir, "nginx-latest.tar", "library/nginx")}, dir, "", "docker.senjone.com")
-	GenerateUploadScript([]skopeo.DownloadResult{makeResult(dir, "nginx-latest.tar", "library/nginx")}, dir, "", "docker.senjone.com")
+	GenerateUploadScript([]skopeo.DownloadResult{makeResult(dir, "nginx-latest.tar", "library/nginx")}, dir, "docker.senjone.com")
+	GenerateUploadScript([]skopeo.DownloadResult{makeResult(dir, "nginx-latest.tar", "library/nginx")}, dir, "docker.senjone.com")
 
 	content, _ := readScript(t, dir)
 	if got := strings.Count(content, "nginx-latest.tar"); got != 1 {
@@ -134,11 +133,11 @@ func TestGenerateUploadScriptNoDuplicates(t *testing.T) {
 
 func TestGenerateUploadScriptPreservesExisting(t *testing.T) {
 	dir := t.TempDir()
-	GenerateUploadScript([]skopeo.DownloadResult{makeResult(dir, "nginx-latest.tar", "library/nginx")}, dir, "", "docker.senjone.com")
+	GenerateUploadScript([]skopeo.DownloadResult{makeResult(dir, "nginx-latest.tar", "library/nginx")}, dir, "docker.senjone.com")
 	GenerateUploadScript([]skopeo.DownloadResult{
 		makeResult(dir, "ubuntu-latest.tar", "library/ubuntu"),
 		makeResult(dir, "redis-alpine.tar", "library/redis:alpine"),
-	}, dir, "", "docker.senjone.com")
+	}, dir, "docker.senjone.com")
 
 	content, _ := readScript(t, dir)
 	for _, want := range []string{"nginx-latest.tar", "ubuntu-latest.tar", "redis-alpine.tar", "$images.Count"} {
@@ -154,7 +153,7 @@ func TestGenerateUploadScriptSkipsFailed(t *testing.T) {
 		{Success: false, ArchiveFile: filepath.Join(dir, "failed.tar"), RepoPath: "library/failed", ImageName: "docker.io/library/failed"},
 		makeResult(dir, "success.tar", "library/success"),
 	}
-	GenerateUploadScript(entries, dir, "", "docker.senjone.com")
+	GenerateUploadScript(entries, dir, "docker.senjone.com")
 
 	content, _ := readScript(t, dir)
 	if strings.Contains(content, "failed.tar") {
@@ -170,7 +169,7 @@ func TestGenerateUploadScriptAllFailed(t *testing.T) {
 	entries := []skopeo.DownloadResult{
 		{Success: false, ArchiveFile: filepath.Join(dir, "failed.tar"), RepoPath: "library/failed", ImageName: "docker.io/library/failed"},
 	}
-	GenerateUploadScript(entries, dir, "", "docker.senjone.com")
+	GenerateUploadScript(entries, dir, "docker.senjone.com")
 
 	if _, ok := readScript(t, dir); ok {
 		t.Error("script should not exist")
@@ -179,7 +178,7 @@ func TestGenerateUploadScriptAllFailed(t *testing.T) {
 
 func TestGenerateUploadScriptRegistry(t *testing.T) {
 	dir := t.TempDir()
-	GenerateUploadScript([]skopeo.DownloadResult{makeResult(dir, "nginx-latest.tar", "library/nginx")}, dir, "", "custom.registry.io")
+	GenerateUploadScript([]skopeo.DownloadResult{makeResult(dir, "nginx-latest.tar", "library/nginx")}, dir, "custom.registry.io")
 
 	content, _ := readScript(t, dir)
 	if !strings.Contains(content, "custom.registry.io/library/nginx") {
@@ -187,34 +186,31 @@ func TestGenerateUploadScriptRegistry(t *testing.T) {
 	}
 }
 
-func TestGenerateUploadScriptCustomSkopeoPath(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("custom path only applies on non-Windows")
-	}
+func TestGenerateUploadScriptGeneratesSh(t *testing.T) {
 	dir := t.TempDir()
-	GenerateUploadScript([]skopeo.DownloadResult{makeResult(dir, "nginx-latest.tar", "library/nginx")}, dir, "/usr/local/bin/skopeo", "docker.senjone.com")
+	GenerateUploadScript([]skopeo.DownloadResult{makeResult(dir, "nginx-latest.tar", "library/nginx")}, dir, "docker.senjone.com")
 
-	content, _ := readScript(t, dir)
-	if !strings.Contains(content, "/usr/local/bin/skopeo") {
-		t.Error("content missing /usr/local/bin/skopeo")
+	data, err := os.ReadFile(filepath.Join(dir, "upload_all.sh"))
+	if err != nil {
+		t.Fatal("upload_all.sh not created")
+	}
+	content := string(data)
+	for _, want := range []string{"#!/usr/bin/env sh", "nginx-latest.tar", "docker.senjone.com/library/nginx"} {
+		if !strings.Contains(content, want) {
+			t.Errorf("upload_all.sh missing %q", want)
+		}
 	}
 }
 
-func TestUploadScriptSkopeoCmdWindows(t *testing.T) {
-	if got := UploadScriptSkopeoCmd("", true); got != `"$PSScriptRoot\skopeo.exe"` {
-		t.Errorf("got %q", got)
-	}
-	if got := UploadScriptSkopeoCmd(`D:\tools\skopeo.exe`, true); got != `"$PSScriptRoot\skopeo.exe"` {
-		t.Errorf("got %q", got)
-	}
-}
+func TestGenerateUploadScriptShMerge(t *testing.T) {
+	dir := t.TempDir()
+	GenerateUploadScript([]skopeo.DownloadResult{makeResult(dir, "nginx-latest.tar", "library/nginx")}, dir, "docker.senjone.com")
+	GenerateUploadScript([]skopeo.DownloadResult{makeResult(dir, "ubuntu-latest.tar", "library/ubuntu")}, dir, "docker.senjone.com")
 
-func TestUploadScriptSkopeoCmdUnix(t *testing.T) {
-	if got := UploadScriptSkopeoCmd("/usr/local/bin/skopeo", false); got != `"/usr/local/bin/skopeo"` {
-		t.Errorf("got %q", got)
-	}
-	if got := UploadScriptSkopeoCmd("", false); got != "skopeo" {
-		t.Errorf("got %q", got)
+	data, _ := os.ReadFile(filepath.Join(dir, "upload_all.sh"))
+	content := string(data)
+	if !strings.Contains(content, "nginx-latest.tar") || !strings.Contains(content, "ubuntu-latest.tar") {
+		t.Error("upload_all.sh missing merged entries")
 	}
 }
 

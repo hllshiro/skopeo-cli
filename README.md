@@ -20,10 +20,10 @@
 
 - **下载** 单个 Docker 镜像
 - **合成** 从 compose 文件批量下载多个镜像（支持 `${VAR}` 变量插值与 `.env`）
-- 生成 PowerShell 上传脚本，推送到私有仓库
+- 生成跨平台上传脚本（`upload_all.sh` / `upload_all.ps1`），推送到私有仓库
 - 多架构支持 (linux/amd64, linux/arm64 等)
 - 通过 `--registry` 选项自定义目标仓库地址
-- 便携式输出目录 (`docker-image-will-upload/`)，Windows 下自动包含 skopeo 二进制文件
+- 便携式输出目录 (`docker-image-will-upload/`)，按白名单在所有平台自动打包 skopeo 二进制文件
 - 跨平台 skopeo 检测与可用性检查
 
 ## 前置要求
@@ -112,21 +112,30 @@ task test                           # 运行测试
 
 ## 输出目录结构
 
-所有下载的镜像、脚本以及（Windows 下的）skopeo 二进制文件都放在保存路径下的 `docker-image-will-upload/` 目录中：
+所有下载的镜像、脚本以及 skopeo 二进制文件都放在保存路径下的 `docker-image-will-upload/` 目录中：
 
 ```
 ~/Downloads/docker-image-will-upload/
 ├── nginx-latest.tar
 ├── ubuntu-latest.tar
-├── upload_all.ps1
-└── skopeo.exe          # 仅 Windows
+├── upload_all.sh       # POSIX sh，用于 Linux / macOS
+├── upload_all.ps1      # PowerShell，用于 Windows
+├── skopeo              # 白名单命中时打包（Unix）
+└── skopeo.exe          # 白名单命中时打包（Windows）
 ```
+
+skopeo 二进制文件按白名单（`skopeo`、`skopeo.exe`）打包：在找到的 skopeo 可执行文件同目录下，白名单命中的文件会被拷贝到输出目录；没有命中则跳过并输出一条 info 日志，上传脚本将回退使用 PATH 中的 skopeo。
 
 这样方便将整个包迁移到其他机器上使用。
 
 ## 上传脚本
 
-下载完成后会生成 `upload_all.ps1` PowerShell 脚本，可将所有镜像推送到配置的目标仓库。脚本使用相对路径并包含 `Set-Location $PSScriptRoot`，可以从任意位置运行。
+下载完成后会生成两份上传脚本，可将所有镜像推送到配置的目标仓库：
+
+- `upload_all.sh` —— POSIX sh 脚本，适用于 Linux / macOS；
+- `upload_all.ps1` —— PowerShell 脚本，适用于 Windows。
+
+两份脚本共享同一份镜像清单，运行时会优先使用脚本同目录下打包的 skopeo 二进制文件，否则回退到 PATH 中的 skopeo。脚本使用相对路径，可从任意位置运行。
 
 ## 跨平台构建
 

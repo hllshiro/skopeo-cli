@@ -1,3 +1,30 @@
+## v2.2.0 — Cross-platform upload scripts and skopeo bundling / 跨平台上传脚本与 skopeo 打包
+
+### Highlights / 亮点
+
+- **Cross-platform upload scripts / 跨平台上传脚本**: the tool now generates both `upload_all.sh` (POSIX sh) and `upload_all.ps1` (PowerShell), so the portable output directory works on Linux, macOS and Windows alike / 现在同时生成 `upload_all.sh`（POSIX sh）与 `upload_all.ps1`（PowerShell），便携输出目录在 Linux、macOS、Windows 上都能直接使用
+- **Whitelist-based skopeo bundling on all platforms / 全平台白名单打包 skopeo**: a whitelist (`skopeo`, `skopeo.exe`) drives which binary is bundled; matching files next to the resolved skopeo binary are copied, and missing entries are skipped with an info log / 通过白名单（`skopeo`、`skopeo.exe`）决定打包哪个二进制；命中同目录文件即拷贝，未命中则跳过并输出 info 日志
+- **Executable bit preserved / 保留可执行位**: bundled skopeo binaries keep their permission bits, so the Unix `skopeo` stays runnable from `upload_all.sh` / 打包的 skopeo 二进制保留权限位，Unix 下的 `skopeo` 可被 `upload_all.sh` 直接执行
+
+### Changes / 变更
+
+- `upload_all.sh` is now generated alongside `upload_all.ps1`; both share one image list and prefer a bundled skopeo binary before falling back to PATH / `upload_all.sh` 与 `upload_all.ps1` 一并生成，共享同一镜像清单，优先使用打包的 skopeo 二进制，否则回退到 PATH
+- skopeo binary bundling now runs on every platform (previously Windows only), driven by `SkopeoBinaryWhitelist` / skopeo 二进制打包改为全平台执行（此前仅 Windows），由 `SkopeoBinaryWhitelist` 驱动
+- When no whitelisted binary is found, bundling is skipped and an info line is logged instead of failing / 未命中白名单时跳过打包并输出 info 日志，而非报错
+- File copies preserve the source permission bits / 文件拷贝保留源文件权限位
+
+### Breaking changes / 破坏性变更
+
+- None to the CLI. The output directory now additionally contains `upload_all.sh` and, on non-Windows platforms, a bundled `skopeo` binary / CLI 无破坏性变更；输出目录现在会额外包含 `upload_all.sh`，且在非 Windows 平台也会打包 `skopeo` 二进制
+
+### Upgrading / 升级指引
+
+```bash
+go build -o skopeo-cli .
+# or with Task installed / 或使用 Task:
+task build
+```
+
 ## v2.1.0 — Robust compose parsing and reliability fixes / 更健壮的 compose 解析与可靠性修复
 
 ### Highlights / 亮点

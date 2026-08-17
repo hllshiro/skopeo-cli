@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -72,23 +71,46 @@ func IsVersionSupported(versionLine string) bool {
 	return minor >= minSkopeoMinor
 }
 
-// CopySkopeoToDir copies the skopeo executable into targetDir.
-func CopySkopeoToDir(targetDir string) error {
+// SkopeoBinaryWhitelist lists the skopeo binary file names to bundle into the
+// output directory. Files in the same directory as the resolved skopeo
+// executable whose names match an entry are copied; names with no matching
+// file are skipped.
+var SkopeoBinaryWhitelist = []string{"skopeo", "skopeo.exe"}
+
+// CopySkopeoToDir bundles whitelisted skopeo binaries into targetDir. It
+// resolves the skopeo executable via PATH, scans its directory for whitelisted
+// file names and copies each match. The returned slice holds the names that
+// ended up in targetDir; it is empty when no whitelisted file was found (which
+// is not an error and should be reported as informational output).
+func CopySkopeoToDir(targetDir string) ([]string, error) {
 	skopeoPath, err := FindSkopeo()
 	if err != nil {
-		return err
+		return nil, err
 	}
+	return CopyWhitelistedBinaries(filepath.Dir(skopeoPath), targetDir, SkopeoBinaryWhitelist)
+}
 
-	destName := "skopeo"
-	if runtime.GOOS == "windows" {
-		destName = "skopeo.exe"
+// CopyWhitelistedBinaries copies each name in whitelist from srcDir into
+// targetDir when it exists as a regular file. A file that already exists in
+// targetDir is left untouched. It returns the names present in targetDir.
+func CopyWhitelistedBinaries(srcDir, targetDir string, whitelist []string) ([]string, error) {
+	copied := []string{}
+	for _, name := range whitelist {
+		src := filepath.Join(srcDir, name)
+		if !isRegularFile(src) {
+			continue
+		}
+		dst := filepath.Join(targetDir, name)
+		if isRegularFile(dst) {
+			copied = append(copied, name)
+			continue
+		}
+		if err := copyFile(src, dst); err != nil {
+			return copied, err
+		}
+		copied = append(copied, name)
 	}
-	destPath := filepath.Join(targetDir, destName)
-
-	if fileExists(destPath) {
-		return nil
-	}
-	return copyFile(skopeoPath, destPath)
+	return copied, nil
 }
 
 // RepoPath strips a leading registry host from an image reference.
@@ -187,6 +209,13 @@ func fileExists(path string) bool {
 	return err == nil
 }
 
+func isRegularFile(path string) bool {
+	fi, err := os.Stat(path)
+	return err == nil && fi.Mode().IsRegular()
+}
+
+// copyFile copies src to dst, preserving the source file's permission bits so
+// that bundled skopeo binaries keep their executable bit on Unix.
 func copyFile(src, dst string) error {
 	in, err := os.Open(src)
 	if err != nil {
@@ -194,7 +223,12 @@ func copyFile(src, dst string) error {
 	}
 	defer in.Close()
 
-	out, err := os.Create(dst)
+	fi, err := in.Stat()
+	if err != nil {
+		return err
+	}
+
+	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, fi.Mode().Perm())
 	if err != nil {
 		return err
 	}

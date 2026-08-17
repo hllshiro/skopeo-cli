@@ -20,10 +20,10 @@ When your private registry uses plain HTTP, skopeo will print a warning. Follow 
 
 - **Download** single Docker images from registries
 - **Compose** batch download multiple images from a compose file (with `${VAR}` interpolation and `.env` support)
-- Generates PowerShell upload scripts for pushing to private registries
+- Generates cross-platform upload scripts (`upload_all.sh` / `upload_all.ps1`) for pushing to private registries
 - Multi-architecture support (linux/amd64, linux/arm64, etc.)
 - Configurable target registry via `--registry` option
-- Portable output directory (`docker-image-will-upload/`) with skopeo binary included on Windows
+- Portable output directory (`docker-image-will-upload/`) with whitelisted skopeo binary bundled on all platforms
 - Cross-platform skopeo detection and availability check
 
 ## Prerequisites
@@ -112,21 +112,30 @@ task test                           # run tests
 
 ## Output Structure
 
-All downloaded images, scripts, and (on Windows) the skopeo binary are placed in a `docker-image-will-upload/` directory under the save path:
+All downloaded images, scripts, and the skopeo binary are placed in a `docker-image-will-upload/` directory under the save path:
 
 ```
 ~/Downloads/docker-image-will-upload/
 ├── nginx-latest.tar
 ├── ubuntu-latest.tar
-├── upload_all.ps1
-└── skopeo.exe          # Windows only
+├── upload_all.sh       # POSIX sh, for Linux / macOS
+├── upload_all.ps1      # PowerShell, for Windows
+├── skopeo              # bundled when whitelist matches (Unix)
+└── skopeo.exe          # bundled when whitelist matches (Windows)
 ```
+
+The skopeo binary is bundled via a whitelist (`skopeo`, `skopeo.exe`): files in the directory of the resolved skopeo executable whose names match the whitelist are copied into the output directory. If nothing matches, bundling is skipped and an info line is logged; the upload scripts then fall back to skopeo on PATH.
 
 This makes it easy to migrate the entire package to another machine.
 
-## Generated Upload Script
+## Generated Upload Scripts
 
-After downloading images, an `upload_all.ps1` PowerShell script is generated that can push all downloaded images to the configured registry. The script uses relative paths and includes `Set-Location $PSScriptRoot` so it can be run from any location.
+After downloading images, two upload scripts are generated to push all images to the configured registry:
+
+- `upload_all.sh` — POSIX sh script, for Linux / macOS;
+- `upload_all.ps1` — PowerShell script, for Windows.
+
+Both scripts share the same image list and prefer a bundled skopeo binary next to the script, falling back to skopeo on PATH. They use relative paths and can be run from any location.
 
 ## Cross-Platform Builds
 

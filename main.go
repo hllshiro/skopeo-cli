@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
+	"strings"
 
 	"github.com/hllshiro/skopeo-cli/internal/cli"
 	"github.com/hllshiro/skopeo-cli/internal/compose"
@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	version         = "2.1.0"
+	version         = "2.2.0"
 	defaultRegistry = "docker.senjone.com"
 )
 
@@ -153,8 +153,7 @@ func downloadCommand(positional []string, opts options) error {
 	outputDir := filepath.Join(savePath, "docker-image-will-upload")
 	ensureDir(outputDir)
 
-	skopeoPath, err := requireSkopeo(outputDir)
-	if err != nil {
+	if err := requireSkopeo(outputDir); err != nil {
 		return err
 	}
 
@@ -170,7 +169,7 @@ func downloadCommand(positional []string, opts options) error {
 	}
 	console.ColorLog(fmt.Sprintf("Recorded: %s -> %s/%s", image, opts.registry, result.RepoPath), "green")
 	if !opts.noUploadScript {
-		upload.GenerateUploadScript([]skopeo.DownloadResult{result}, outputDir, scriptSkopeoPath(skopeoPath), opts.registry)
+		upload.GenerateUploadScript([]skopeo.DownloadResult{result}, outputDir, opts.registry)
 	}
 
 	console.ColorLog(fmt.Sprintf("Output directory: %s", outputDir), "cyan")
@@ -205,8 +204,7 @@ func composeCommand(positional []string, opts options) error {
 	outputDir := filepath.Join(savePath, "docker-image-will-upload")
 	ensureDir(outputDir)
 
-	skopeoPath, err := requireSkopeo(outputDir)
-	if err != nil {
+	if err := requireSkopeo(outputDir); err != nil {
 		return err
 	}
 
@@ -243,7 +241,7 @@ func composeCommand(positional []string, opts options) error {
 	}
 
 	if !opts.noUploadScript {
-		upload.GenerateUploadScript(results, outputDir, scriptSkopeoPath(skopeoPath), opts.registry)
+		upload.GenerateUploadScript(results, outputDir, opts.registry)
 	}
 
 	console.ColorLog(fmt.Sprintf("Output directory: %s", outputDir), "cyan")
@@ -254,22 +252,13 @@ func composeCommand(positional []string, opts options) error {
 	return nil
 }
 
-// scriptSkopeoPath returns the skopeo path to embed in the upload script. On
-// non-Windows the script relies on skopeo being in PATH, so it is empty.
-func scriptSkopeoPath(skopeoPath string) string {
-	if runtime.GOOS == "windows" {
-		return skopeoPath
-	}
-	return ""
-}
-
-func requireSkopeo(outputDir string) (string, error) {
+func requireSkopeo(outputDir string) error {
 	skopeoPath, err := skopeo.FindSkopeo()
 	if err != nil {
 		console.ColorLogErr("Error: skopeo not found. Please install skopeo first.", "red")
 		console.ColorLogErr("  Windows: https://github.com/containers/skopeo/blob/main/install.md", "white")
 		console.ColorLogErr("  Linux:   sudo apt install skopeo / sudo yum install skopeo", "white")
-		return "", err
+		return err
 	}
 	console.ColorLog(fmt.Sprintf("Found skopeo: %s", skopeoPath), "cyan")
 
@@ -278,20 +267,23 @@ func requireSkopeo(outputDir string) (string, error) {
 			console.ColorLogErr(fmt.Sprintf("Error: skopeo version %s is too old; minimum supported is 1.6.0 (requires --all multi-architecture support).", v), "red")
 			console.ColorLogErr("Versions below 1.6.0 may fail with:", "white")
 			console.ColorLogErr("  unsupported MIME type for compression: application/vnd.in-toto+json", "white")
-			return "", fmt.Errorf("skopeo version %s is below the minimum 1.6.0", v)
+			return fmt.Errorf("skopeo version %s is below the minimum 1.6.0", v)
 		}
 		console.ColorLog(fmt.Sprintf("skopeo version: %s", v), "cyan")
 	} else {
 		console.ColorLog(fmt.Sprintf("Warning: could not check skopeo version: %v", verr), "yellow")
 	}
 
-	if runtime.GOOS == "windows" {
-		console.ColorLog("Copying skopeo to output directory...", "cyan")
-		if err := skopeo.CopySkopeoToDir(outputDir); err != nil {
-			return "", err
-		}
+	copied, err := skopeo.CopySkopeoToDir(outputDir)
+	if err != nil {
+		return err
 	}
-	return skopeoPath, nil
+	if len(copied) == 0 {
+		console.ColorLog(fmt.Sprintf("Info: no whitelisted skopeo binary (%s) found next to %s; upload scripts will use skopeo from PATH.", strings.Join(skopeo.SkopeoBinaryWhitelist, ", "), skopeoPath), "cyan")
+	} else {
+		console.ColorLog(fmt.Sprintf("Bundled skopeo binary: %s", strings.Join(copied, ", ")), "cyan")
+	}
+	return nil
 }
 
 func ensureDir(path string) {

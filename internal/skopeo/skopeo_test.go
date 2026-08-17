@@ -1,7 +1,10 @@
 package skopeo
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
+	"runtime"
 	"testing"
 )
 
@@ -88,5 +91,103 @@ func TestIsVersionSupported(t *testing.T) {
 		if got := IsVersionSupported(c.line); got != c.want {
 			t.Errorf("IsVersionSupported(%q) = %v, want %v", c.line, got, c.want)
 		}
+	}
+}
+
+func writeTestFile(t *testing.T, path, content string, mode os.FileMode) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(content), mode); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCopyWhitelistedBinaries(t *testing.T) {
+	src := t.TempDir()
+	dst := t.TempDir()
+	writeTestFile(t, filepath.Join(src, "skopeo"), "unix-bin", 0755)
+	writeTestFile(t, filepath.Join(src, "skopeo.exe"), "win-bin", 0644)
+
+	got, err := CopyWhitelistedBinaries(src, dst, []string{"skopeo", "skopeo.exe"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, []string{"skopeo", "skopeo.exe"}) {
+		t.Errorf("got %v, want [skopeo skopeo.exe]", got)
+	}
+	for _, name := range []string{"skopeo", "skopeo.exe"} {
+		if _, err := os.Stat(filepath.Join(dst, name)); err != nil {
+			t.Errorf("%s not copied: %v", name, err)
+		}
+	}
+}
+
+func TestCopyWhitelistedBinariesSkipsMissing(t *testing.T) {
+	src := t.TempDir()
+	dst := t.TempDir()
+	writeTestFile(t, filepath.Join(src, "skopeo"), "unix-bin", 0755)
+
+	got, err := CopyWhitelistedBinaries(src, dst, []string{"skopeo", "skopeo.exe"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, []string{"skopeo"}) {
+		t.Errorf("got %v, want [skopeo]", got)
+	}
+	if _, err := os.Stat(filepath.Join(dst, "skopeo.exe")); !os.IsNotExist(err) {
+		t.Error("skopeo.exe should not have been copied")
+	}
+}
+
+func TestCopyWhitelistedBinariesNoneMatch(t *testing.T) {
+	src := t.TempDir()
+	dst := t.TempDir()
+
+	got, err := CopyWhitelistedBinaries(src, dst, []string{"skopeo", "skopeo.exe"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 0 {
+		t.Errorf("got %v, want empty", got)
+	}
+}
+
+func TestCopyWhitelistedBinariesPreservesMode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("executable bit is not meaningful on Windows")
+	}
+	src := t.TempDir()
+	dst := t.TempDir()
+	writeTestFile(t, filepath.Join(src, "skopeo"), "unix-bin", 0755)
+
+	if _, err := CopyWhitelistedBinaries(src, dst, []string{"skopeo"}); err != nil {
+		t.Fatal(err)
+	}
+	fi, err := os.Stat(filepath.Join(dst, "skopeo"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fi.Mode().Perm()&0100 == 0 {
+		t.Errorf("copied skopeo lost executable bit: %v", fi.Mode().Perm())
+	}
+}
+
+func TestCopyWhitelistedBinariesSkipsExistingDest(t *testing.T) {
+	src := t.TempDir()
+	dst := t.TempDir()
+	writeTestFile(t, filepath.Join(src, "skopeo"), "new", 0755)
+	writeTestFile(t, filepath.Join(dst, "skopeo"), "existing", 0644)
+
+	if _, err := CopyWhitelistedBinaries(src, dst, []string{"skopeo"}); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(dst, "skopeo"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "existing" {
+		t.Errorf("existing dest was overwritten: %q", string(data))
 	}
 }
