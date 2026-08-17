@@ -7,7 +7,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -16,11 +18,10 @@ import (
 
 // DownloadOptions configures a single image download.
 type DownloadOptions struct {
-	SavePath       string
-	Platform       string
-	Overwrite      bool
-	NoUploadScript bool
-	Registry       string
+	SavePath  string
+	Platform  string
+	Overwrite bool
+	Registry  string
 }
 
 // DownloadResult reports the outcome of a download.
@@ -35,6 +36,40 @@ type DownloadResult struct {
 // cannot be found in PATH.
 func FindSkopeo() (string, error) {
 	return exec.LookPath("skopeo")
+}
+
+// minSkopeoMajor and minSkopeoMinor define the minimum supported skopeo
+// version (1.6.0). Older releases lack the --all flag needed for
+// multi-architecture image copies.
+const minSkopeoMajor, minSkopeoMinor = 1, 6
+
+var skopeoVersionRe = regexp.MustCompile(`(\d+)\.(\d+)(?:\.(\d+))?`)
+
+// VersionString returns the trimmed output of `<bin> --version`.
+func VersionString(bin string) (string, error) {
+	out, err := exec.Command(bin, "--version").Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+// IsVersionSupported reports whether a `skopeo --version` output line meets
+// the minimum supported version (1.6.0). Unparseable output is rejected.
+func IsVersionSupported(versionLine string) bool {
+	m := skopeoVersionRe.FindStringSubmatch(versionLine)
+	if len(m) < 3 {
+		return false
+	}
+	major, err1 := strconv.Atoi(m[1])
+	minor, err2 := strconv.Atoi(m[2])
+	if err1 != nil || err2 != nil {
+		return false
+	}
+	if major != minSkopeoMajor {
+		return major > minSkopeoMajor
+	}
+	return minor >= minSkopeoMinor
 }
 
 // CopySkopeoToDir copies the skopeo executable into targetDir.
@@ -117,7 +152,7 @@ func DownloadImage(image string, opts DownloadOptions) DownloadResult {
 	}
 
 	if err := cmd.Start(); err != nil {
-		console.ColorLog(fmt.Sprintf("skopeo not found or not in PATH: %v", err), "red")
+		console.ColorLogErr(fmt.Sprintf("skopeo not found or not in PATH: %v", err), "red")
 		return DownloadResult{Success: false, ArchiveFile: archiveFile, RepoPath: repoPath, ImageName: image}
 	}
 
@@ -135,9 +170,9 @@ func DownloadImage(image string, opts DownloadOptions) DownloadResult {
 	wg.Wait()
 
 	if err := cmd.Wait(); err != nil {
-		console.ColorLog(fmt.Sprintf("Failed to download image: %s", image), "red")
+		console.ColorLogErr(fmt.Sprintf("Failed to download image: %s", image), "red")
 		if stderrBuf.Len() > 0 {
-			console.ColorLog(stderrBuf.String(), "red")
+			console.ColorLogErr(stderrBuf.String(), "red")
 		}
 		_ = os.Remove(archiveFile)
 		return DownloadResult{Success: false, ArchiveFile: archiveFile, RepoPath: repoPath, ImageName: image}

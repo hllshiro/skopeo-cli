@@ -67,3 +67,26 @@ func TestBuildSkopeoArgs(t *testing.T) {
 		}
 	}
 }
+
+func TestIsVersionSupported(t *testing.T) {
+	cases := []struct {
+		line string
+		want bool
+	}{
+		{"skopeo version 1.23.0", true},
+		{"skopeo version 1.14.0", true},
+		{"skopeo version 1.6.0", true},
+		{"skopeo version 1.6.0 (commit: abc123, ...)", true},
+		{"skopeo version 2.0.0", true},
+		{"skopeo version 1.5.4", false},
+		{"skopeo version 0.1.40", false},
+		{"skopeo version 1.5", false},
+		{"unexpected output", false},
+		{"", false},
+	}
+	for _, c := range cases {
+		if got := IsVersionSupported(c.line); got != c.want {
+			t.Errorf("IsVersionSupported(%q) = %v, want %v", c.line, got, c.want)
+		}
+	}
+}

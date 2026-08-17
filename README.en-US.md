@@ -10,10 +10,16 @@ This tool is designed for air-gapped environments where you need to download con
 
 For setting up a private container registry, we recommend [zot](https://github.com/project-zot/zot) — a native, OCI-compatible registry with minimal resource requirements.
 
+When your private registry uses plain HTTP, skopeo will print a warning. Follow the hint and create a `policy.json` file at the indicated location (usually `/etc/containers/policy.json` on Linux) with the following content:
+
+```json
+{"default": [{"type":"insecureAcceptAnything"}]}
+```
+
 ## Features
 
 - **Download** single Docker images from registries
-- **Compose** batch download multiple images from a compose file
+- **Compose** batch download multiple images from a compose file (with `${VAR}` interpolation and `.env` support)
 - Generates PowerShell upload scripts for pushing to private registries
 - Multi-architecture support (linux/amd64, linux/arm64, etc.)
 - Configurable target registry via `--registry` option
@@ -34,6 +40,8 @@ This tool requires skopeo with support for `--all` flag (multi-architecture imag
 ```
 unsupported MIME type for compression: application/vnd.in-toto+json
 ```
+
+The version is also checked automatically at runtime; versions below 1.6.0 are rejected with a hint.
 
 **Tested versions:**
 - 1.23.0 (recommended)
@@ -100,6 +108,8 @@ task test                           # run tests
 ./skopeo-cli compose docker-compose.yml --save ./images --registry gcr.io/my-project
 ```
 
+`<file>` may be a file path or a directory (standard names `compose.yaml`, `compose.yml`, `docker-compose.yaml`, `docker-compose.yml` are looked up inside). `${VAR}`, `${VAR:-default}` and `${VAR-default}` in image references are resolved from the environment first, then a `.env` file next to the compose file.
+
 ## Output Structure
 
 All downloaded images, scripts, and (on Windows) the skopeo binary are placed in a `docker-image-will-upload/` directory under the save path:
@@ -128,9 +138,9 @@ git push origin v1.1.0
 ```
 
 This will automatically build and publish binaries for:
-- Windows (x86_64)
-- Linux (x86_64)
-- macOS (x86_64)
+- Windows (x86_64, arm64)
+- Linux (x86_64, arm64)
+- macOS (x86_64, arm64)
 
 ## License
 

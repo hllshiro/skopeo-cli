@@ -58,6 +58,9 @@ func main() {
 		os.Exit(1)
 	}
 	if err != nil {
+		if err != errUsage {
+			console.ColorLogErr("Error: "+err.Error(), "red")
+		}
 		os.Exit(1)
 	}
 }
@@ -156,18 +159,18 @@ func downloadCommand(positional []string, opts options) error {
 	}
 
 	result := skopeo.DownloadImage(image, skopeo.DownloadOptions{
-		SavePath:       outputDir,
-		Platform:       opts.platform,
-		Overwrite:      opts.overwrite,
-		NoUploadScript: opts.noUploadScript,
-		Registry:       opts.registry,
+		SavePath:  outputDir,
+		Platform:  opts.platform,
+		Overwrite: opts.overwrite,
+		Registry:  opts.registry,
 	})
 
-	if result.Success {
-		console.ColorLog(fmt.Sprintf("Recorded: %s -> %s/%s", image, opts.registry, result.RepoPath), "green")
-		if !opts.noUploadScript {
-			upload.GenerateUploadScript([]skopeo.DownloadResult{result}, outputDir, scriptSkopeoPath(skopeoPath), opts.registry)
-		}
+	if !result.Success {
+		return fmt.Errorf("download failed: %s", image)
+	}
+	console.ColorLog(fmt.Sprintf("Recorded: %s -> %s/%s", image, opts.registry, result.RepoPath), "green")
+	if !opts.noUploadScript {
+		upload.GenerateUploadScript([]skopeo.DownloadResult{result}, outputDir, scriptSkopeoPath(skopeoPath), opts.registry)
 	}
 
 	console.ColorLog(fmt.Sprintf("Output directory: %s", outputDir), "cyan")
@@ -188,7 +191,6 @@ func composeCommand(positional []string, opts options) error {
 
 	images, err := compose.ParseComposeFile(file, opts.filter)
 	if err != nil {
-		console.ColorLog(err.Error(), "red")
 		return err
 	}
 	if len(images) == 0 {
@@ -215,15 +217,14 @@ func composeCommand(positional []string, opts options) error {
 	for i, img := range images {
 		console.ColorLog(fmt.Sprintf("[%d/%d] Processing: %s", i+1, len(images), img), "cyan")
 		result := skopeo.DownloadImage(img, skopeo.DownloadOptions{
-			SavePath:       outputDir,
-			Platform:       opts.platform,
-			Overwrite:      opts.overwrite,
-			NoUploadScript: opts.noUploadScript,
-			Registry:       opts.registry,
+			SavePath:  outputDir,
+			Platform:  opts.platform,
+			Overwrite: opts.overwrite,
+			Registry:  opts.registry,
 		})
 		results = append(results, result)
 		if !result.Success {
-			console.ColorLog(fmt.Sprintf("Warning: %s download failed.", img), "yellow")
+			console.ColorLogErr(fmt.Sprintf("Warning: %s download failed.", img), "yellow")
 		}
 		fmt.Println("--------------------------------------------------")
 	}
@@ -246,6 +247,10 @@ func composeCommand(positional []string, opts options) error {
 	}
 
 	console.ColorLog(fmt.Sprintf("Output directory: %s", outputDir), "cyan")
+
+	if failed > 0 {
+		return fmt.Errorf("%d image(s) failed to download", failed)
+	}
 	return nil
 }
 
@@ -261,12 +266,24 @@ func scriptSkopeoPath(skopeoPath string) string {
 func requireSkopeo(outputDir string) (string, error) {
 	skopeoPath, err := skopeo.FindSkopeo()
 	if err != nil {
-		console.ColorLog("Error: skopeo not found. Please install skopeo first.", "red")
-		console.ColorLog("  Windows: https://github.com/containers/skopeo/blob/main/install.md", "white")
-		console.ColorLog("  Linux:   sudo apt install skopeo / sudo yum install skopeo", "white")
+		console.ColorLogErr("Error: skopeo not found. Please install skopeo first.", "red")
+		console.ColorLogErr("  Windows: https://github.com/containers/skopeo/blob/main/install.md", "white")
+		console.ColorLogErr("  Linux:   sudo apt install skopeo / sudo yum install skopeo", "white")
 		return "", err
 	}
 	console.ColorLog(fmt.Sprintf("Found skopeo: %s", skopeoPath), "cyan")
+
+	if v, verr := skopeo.VersionString(skopeoPath); verr == nil {
+		if !skopeo.IsVersionSupported(v) {
+			console.ColorLogErr(fmt.Sprintf("Error: skopeo version %s is too old; minimum supported is 1.6.0 (requires --all multi-architecture support).", v), "red")
+			console.ColorLogErr("Versions below 1.6.0 may fail with:", "white")
+			console.ColorLogErr("  unsupported MIME type for compression: application/vnd.in-toto+json", "white")
+			return "", fmt.Errorf("skopeo version %s is below the minimum 1.6.0", v)
+		}
+		console.ColorLog(fmt.Sprintf("skopeo version: %s", v), "cyan")
+	} else {
+		console.ColorLog(fmt.Sprintf("Warning: could not check skopeo version: %v", verr), "yellow")
+	}
 
 	if runtime.GOOS == "windows" {
 		console.ColorLog("Copying skopeo to output directory...", "cyan")

@@ -10,10 +10,16 @@
 
 推荐使用 [zot](https://github.com/project-zot/zot) 搭建私有容器仓库 —— 一个原生 OCI 兼容的仓库，资源占用极低。
 
+当私服使用 http 协议时，根据 skopeo 输出的 warning 提示，在指定位置（Linux 下通常为 `/etc/containers/policy.json`）编写 `policy.json` 文件，内容参考如下：
+
+```json
+{"default": [{"type":"insecureAcceptAnything"}]}
+```
+
 ## 功能特性
 
 - **下载** 单个 Docker 镜像
-- **合成** 从 compose 文件批量下载多个镜像
+- **合成** 从 compose 文件批量下载多个镜像（支持 `${VAR}` 变量插值与 `.env`）
 - 生成 PowerShell 上传脚本，推送到私有仓库
 - 多架构支持 (linux/amd64, linux/arm64 等)
 - 通过 `--registry` 选项自定义目标仓库地址
@@ -34,6 +40,8 @@
 ```
 unsupported MIME type for compression: application/vnd.in-toto+json
 ```
+
+运行时也会自动校验 skopeo 版本，低于 1.6.0 会提示并退出。
 
 **已测试版本：**
 - 1.23.0（推荐）
@@ -100,6 +108,8 @@ task test                           # 运行测试
 ./skopeo-cli compose docker-compose.yml --save ./images --registry gcr.io/my-project
 ```
 
+`<file>` 可以是文件路径或目录（目录下自动查找 `compose.yaml`、`compose.yml`、`docker-compose.yaml`、`docker-compose.yml`）。镜像引用中的 `${VAR}`、`${VAR:-default}`、`${VAR-default}` 会按「环境变量 → 同目录 `.env` 文件」的顺序解析。
+
 ## 输出目录结构
 
 所有下载的镜像、脚本以及（Windows 下的）skopeo 二进制文件都放在保存路径下的 `docker-image-will-upload/` 目录中：
@@ -128,9 +138,9 @@ git push origin v1.1.0
 ```
 
 自动构建并发布以下平台的二进制文件：
-- Windows (x86_64)
-- Linux (x86_64)
-- macOS (x86_64)
+- Windows (x86_64, arm64)
+- Linux (x86_64, arm64)
+- macOS (x86_64, arm64)
 
 ## 许可证
 

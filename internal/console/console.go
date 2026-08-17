@@ -23,6 +23,12 @@ func ColorLog(msg, color string) {
 	colorLogTo(os.Stdout, msg, color)
 }
 
+// ColorLogErr prints msg to stderr in the given color. Use it for error
+// output so that normal output and errors can be separated in pipelines.
+func ColorLogErr(msg, color string) {
+	colorLogTo(os.Stderr, msg, color)
+}
+
 func colorLogTo(w io.Writer, msg, color string) {
 	code := colors[strings.ToLower(color)]
 	if code == "" {
