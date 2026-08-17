@@ -29,7 +29,7 @@ When your private registry uses plain HTTP, skopeo will print a warning. Follow 
 ## Prerequisites
 
 - [Go](https://go.dev) 1.25+ (for building from source)
-- [skopeo](https://github.com/containers/skopeo) CLI installed
+- [skopeo](https://github.com/containers/skopeo) CLI installed (prebuilt Windows executables: [winskopeo](https://github.com/passcod/winskopeo))
 
 ### Skopeo Version Requirements
 

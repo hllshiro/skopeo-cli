@@ -29,7 +29,7 @@
 ## 前置要求
 
 - [Go](https://go.dev) 1.25+（从源码构建时需要）
-- [skopeo](https://github.com/containers/skopeo) CLI
+- [skopeo](https://github.com/containers/skopeo) CLI（Windows 预编译可执行文件见 [winskopeo](https://github.com/passcod/winskopeo)）
 
 ### Skopeo 版本要求
 
